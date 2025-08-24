@@ -1,8 +1,7 @@
-// Mock Supabase client interface
-interface MockSupabaseClient {
+interface SupabaseClient {
   auth: {
-    signUp: (options: any) => Promise<{ data: any; error: any }>
-    signInWithPassword: (options: any) => Promise<{ data: any; error: any }>
+    signUp: (options: { email: string; password: string }) => Promise<{ data: any; error: any }>
+    signInWithPassword: (options: { email: string; password: string }) => Promise<{ data: any; error: any }>
     signOut: () => Promise<{ error: any }>
     getUser: () => Promise<{ data: { user: any }; error: any }>
     getSession: () => Promise<{ data: { session: any }; error: any }>
@@ -10,321 +9,250 @@ interface MockSupabaseClient {
       data: { subscription: { unsubscribe: () => void } }
     }
   }
-  from: (table: string) => {
-    select: (columns?: string) => any
-    insert: (data: any) => any
-    update: (data: any) => any
-    delete: () => any
-    eq: (column: string, value: any) => any
-    single: () => any
-    order: (column: string, options?: { ascending?: boolean }) => any
+  from: (table: string) => any
+}
+
+class CustomSupabaseClient implements SupabaseClient {
+  private baseUrl: string
+  private apiKey: string
+  private session: any = null
+
+  constructor(url: string, key: string) {
+    this.baseUrl = url
+    this.apiKey = key
   }
-}
 
-// Mock user database - simulates persistent storage
-const mockUsers: Record<string, any> = {
-  "admin@nestbox.app": {
-    id: "admin-user-id",
-    email: "admin@nestbox.app",
-    user_metadata: { full_name: "Admin User", role: "admin" },
-    profile: {
-      id: "admin-profile-id",
-      user_id: "admin-user-id",
-      email: "admin@nestbox.app",
-      first_name: "Admin",
-      last_name: "User",
-      role: "admin",
-      phone: null,
-      bio: null,
-      location: null,
-      total_observations: 0,
-      total_maintenance_tasks: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  },
-}
-
-const updateUserRole = (userId: string, newRole: string) => {
-  // Find user by user_id and update role
-  const userEntry = Object.values(mockUsers).find((user: any) => user.profile?.user_id === userId)
-  if (userEntry && userEntry.profile) {
-    userEntry.profile.role = newRole
-    userEntry.profile.updated_at = new Date().toISOString()
-    return userEntry.profile
-  }
-  return null
-}
-
-// Mock implementation for development
-const createMockClient = (): MockSupabaseClient => {
-  return {
-    auth: {
-      signUp: async (options) => {
-        console.log("[v0] Mock signUp called with:", options)
-
-        // Generate new user ID
-        const newUserId = `user-${Date.now()}`
-        const newUser = {
-          id: newUserId,
-          email: options.email,
-          user_metadata: { full_name: `${options.email}`, role: "volunteer" },
-        }
-
-        // Store user in mock database
-        mockUsers[options.email] = {
-          ...newUser,
-          profile: null, // Will be created separately
-        }
-
-        return {
-          data: {
-            user: newUser,
-            session: { access_token: `mock-token-${newUserId}`, user: newUser },
+  auth = {
+    signUp: async (options: { email: string; password: string }) => {
+      try {
+        const response = await fetch(`${this.baseUrl}/auth/v1/signup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: this.apiKey,
           },
-          error: null,
-        }
-      },
-      signInWithPassword: async (options) => {
-        console.log("[v0] Mock signIn called with:", options.email)
+          body: JSON.stringify(options),
+        })
 
-        // Check if user exists in mock database
-        const existingUser = mockUsers[options.email]
-        if (existingUser) {
-          return {
-            data: {
-              user: existingUser,
-              session: { access_token: `mock-token-${existingUser.id}`, user: existingUser },
-            },
-            error: null,
+        const data = await response.json()
+
+        if (response.ok) {
+          // Create profile in database
+          if (data.user) {
+            await this.from("profiles").insert({
+              id: data.user.id,
+              email: data.user.email,
+              full_name: data.user.email.split("@")[0],
+              role: "volunteer",
+            })
           }
-        }
 
-        // Default mock user for testing
-        const mockUser = {
-          id: "mock-user-id",
-          email: options.email,
-          user_metadata: { full_name: "Mock User", role: "volunteer" },
+          return { data, error: null }
+        } else {
+          return { data: null, error: data }
         }
-
-        return {
-          data: { user: mockUser, session: { access_token: "mock-token", user: mockUser } },
-          error: null,
-        }
-      },
-      signOut: async () => {
-        console.log("[v0] Mock signOut called")
-        return { error: null }
-      },
-      getUser: async () => {
-        return { data: { user: null }, error: null }
-      },
-      getSession: async () => {
-        return { data: { session: null }, error: null }
-      },
-      onAuthStateChange: (callback: (event: string, session: any) => void) => {
-        console.log("[v0] Mock onAuthStateChange called")
-
-        return {
-          data: {
-            subscription: {
-              unsubscribe: () => {
-                console.log("[v0] Mock subscription unsubscribed")
-              },
-            },
-          },
-        }
-      },
+      } catch (error) {
+        return { data: null, error: { message: "Network error during signup" } }
+      }
     },
-    from: (table: string) => {
-      console.log("[v0] Mock database query on table:", table)
 
-      // Mock data for different tables
-      const mockData: Record<string, any[]> = {
-        user_profiles: Object.values(mockUsers)
-          .map((user) => user.profile)
-          .filter(Boolean),
-        nest_boxes: [
-          {
-            id: "mock-1",
-            box_id: "NB001",
-            name: "Oak Grove Box #1",
-            description: "Located in the community park near the oak grove.",
-            box_type: "standard",
-            latitude: 42.1237,
-            longitude: -71.1786,
-            location_name: "Sharon Community Garden",
-            location_description: "Near the main entrance",
-            status: "active",
-            maintenance_status: "good",
-            installation_date: "2024-01-01",
-            target_species: ["Eastern Bluebird"],
-            primary_species: "Eastern Bluebird",
-            is_public: true,
-            featured: false,
-            sponsor_dedication: "In memory of John Smith",
-            custom_fields: {},
-            created_at: "2024-01-01T00:00:00Z",
-            updated_at: "2024-01-01T00:00:00Z",
+    signInWithPassword: async (options: { email: string; password: string }) => {
+      try {
+        const response = await fetch(`${this.baseUrl}/auth/v1/token?grant_type=password`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: this.apiKey,
           },
-          {
-            id: "mock-2",
-            box_id: "NB002",
-            name: "Borderland Trail Box",
-            description: "Trail marker box for hikers.",
-            box_type: "platform",
-            latitude: 42.1156,
-            longitude: -71.1789,
-            location_name: "Borderland State Park",
-            location_description: "Main trail entrance",
-            status: "maintenance",
-            maintenance_status: "needs-cleaning",
-            installation_date: "2024-02-15",
-            target_species: ["American Robin"],
-            primary_species: "American Robin",
-            is_public: true,
-            featured: true,
-            sponsor_dedication: "Community Sponsored",
-            custom_fields: {},
-            created_at: "2024-02-15T00:00:00Z",
-            updated_at: "2024-02-15T00:00:00Z",
-          },
-        ],
-        activity_logs: [
-          {
-            id: "1",
-            nest_box_id: "1",
-            volunteer_id: "mock-user-id",
-            species_observed: "Eastern Bluebird",
-            egg_count: 3,
-            observation_date: new Date().toISOString(),
-          },
-        ],
-        volunteer_assignments: [
-          {
-            id: "1",
-            nest_box_id: "2",
-            volunteer_id: "mock-user-id",
-            assignment_type: "maintenance",
-            status: "assigned",
-            description: "Clean nest box and check for damage",
-          },
-        ],
-      }
+          body: JSON.stringify(options),
+        })
 
-      const createQueryBuilder = (data: any[]) => {
-        let filteredData = [...data]
+        const data = await response.json()
 
-        const queryBuilder = {
-          select: (columns?: string) => {
-            return {
-              ...queryBuilder,
-              eq: (column: string, value: any) => {
-                filteredData = filteredData.filter((item: any) => item[column] === value)
-                return {
-                  ...queryBuilder,
-                  order: (column: string, options?: { ascending?: boolean }) => {
-                    filteredData.sort((a: any, b: any) => {
-                      const aVal = a[column]
-                      const bVal = b[column]
-                      if (options?.ascending === false) {
-                        return bVal > aVal ? 1 : -1
-                      }
-                      return aVal > bVal ? 1 : -1
-                    })
-                    return Promise.resolve({ data: filteredData, error: null })
-                  },
-                  then: (callback: any) => callback({ data: filteredData, error: null }),
-                }
-              },
-              order: (column: string, options?: { ascending?: boolean }) => {
-                filteredData.sort((a: any, b: any) => {
-                  const aVal = a[column]
-                  const bVal = b[column]
-                  if (options?.ascending === false) {
-                    return bVal > aVal ? 1 : -1
-                  }
-                  return aVal > bVal ? 1 : -1
-                })
-                return Promise.resolve({ data: filteredData, error: null })
-              },
-              then: (callback: any) => callback({ data: filteredData, error: null }),
-            }
-          },
-          eq: (column: string, value: any) => {
-            filteredData = filteredData.filter((item: any) => item[column] === value)
-            return {
-              ...queryBuilder,
-              single: () => Promise.resolve({ data: filteredData[0] || null, error: null }),
-              then: (callback: any) => callback({ data: filteredData, error: null }),
-            }
-          },
-          single: () => Promise.resolve({ data: filteredData[0] || null, error: null }),
-          then: (callback: any) => callback({ data: filteredData, error: null }),
+        if (response.ok) {
+          this.session = data
+          return { data, error: null }
+        } else {
+          return { data: null, error: data }
         }
-
-        return queryBuilder
+      } catch (error) {
+        return { data: null, error: { message: "Network error during sign in" } }
       }
+    },
+
+    signOut: async () => {
+      try {
+        const response = await fetch(`${this.baseUrl}/auth/v1/logout`, {
+          method: "POST",
+          headers: {
+            apikey: this.apiKey,
+            Authorization: `Bearer ${this.session?.access_token}`,
+          },
+        })
+
+        this.session = null
+        return { error: null }
+      } catch (error) {
+        return { error: { message: "Network error during sign out" } }
+      }
+    },
+
+    getUser: async () => {
+      if (!this.session?.access_token) {
+        return { data: { user: null }, error: null }
+      }
+
+      try {
+        const response = await fetch(`${this.baseUrl}/auth/v1/user`, {
+          headers: {
+            apikey: this.apiKey,
+            Authorization: `Bearer ${this.session.access_token}`,
+          },
+        })
+
+        const data = await response.json()
+        return { data: { user: response.ok ? data : null }, error: response.ok ? null : data }
+      } catch (error) {
+        return { data: { user: null }, error: { message: "Network error getting user" } }
+      }
+    },
+
+    getSession: async () => {
+      return { data: { session: this.session }, error: null }
+    },
+
+    onAuthStateChange: (callback: (event: string, session: any) => void) => {
+      // Simulate auth state change
+      setTimeout(() => callback("INITIAL_SESSION", this.session), 100)
 
       return {
-        select: (columns?: string) => createQueryBuilder(mockData[table] || []).select(columns),
-        insert: (data: any) => {
-          if (table === "user_profiles") {
-            const newProfile = {
-              id: `profile-${Date.now()}`,
-              ...data,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }
-
-            // Find user by user_id and add profile
-            const userEntry = Object.values(mockUsers).find((user: any) => user.id === data.user_id)
-            if (userEntry) {
-              userEntry.profile = newProfile
-            }
-
-            return {
-              select: () => ({
-                single: () => Promise.resolve({ data: newProfile, error: null }),
-              }),
-              then: (callback: any) => callback({ data: newProfile, error: null }),
-            }
-          }
-
-          return {
-            select: () => ({
-              single: () => Promise.resolve({ data: { id: "new-id", ...data }, error: null }),
-            }),
-            then: (callback: any) => callback({ data: { id: "new-id", ...data }, error: null }),
-          }
-        },
-        update: (data: any) => ({
-          eq: (column: string, value: any) => ({
-            then: (callback: any) => {
-              if (table === "user_profiles" && column === "id" && data.role) {
-                const updatedProfile = updateUserRole(value, data.role)
-                if (updatedProfile) {
-                  return callback({ data: updatedProfile, error: null })
-                }
-              }
-              return callback({ data: { ...data }, error: null })
+        data: {
+          subscription: {
+            unsubscribe: () => {
+              console.log("Auth state change unsubscribed")
             },
-          }),
-        }),
-        delete: () => ({
-          eq: (column: string, value: any) => ({
-            then: (callback: any) => callback({ data: null, error: null }),
-          }),
-        }),
-        eq: (column: string, value: any) => createQueryBuilder(mockData[table] || []).eq(column, value),
-        single: () => Promise.resolve({ data: mockData[table]?.[0] || null, error: null }),
-        order: (column: string, options?: { ascending?: boolean }) =>
-          createQueryBuilder(mockData[table] || []).order(column, options),
+          },
+        },
       }
     },
+  }
+
+  from = (table: string) => {
+    const createQueryBuilder = () => {
+      let query = ""
+      const filters: string[] = []
+
+      const builder = {
+        select: (columns = "*") => {
+          query = `select=${columns}`
+          return {
+            ...builder,
+            eq: (column: string, value: any) => {
+              filters.push(`${column}=eq.${value}`)
+              return {
+                ...builder,
+                order: (column: string, options?: { ascending?: boolean }) => {
+                  const direction = options?.ascending === false ? "desc" : "asc"
+                  query += `&order=${column}.${direction}`
+                  return this.executeQuery(table, query, filters)
+                },
+                then: (callback: any) => this.executeQuery(table, query, filters).then(callback),
+              }
+            },
+            order: (column: string, options?: { ascending?: boolean }) => {
+              const direction = options?.ascending === false ? "desc" : "asc"
+              query += `&order=${column}.${direction}`
+              return this.executeQuery(table, query, filters)
+            },
+            then: (callback: any) => this.executeQuery(table, query, filters).then(callback),
+          }
+        },
+        insert: (data: any) => ({
+          select: () => ({
+            single: () => this.executeInsert(table, data),
+          }),
+          then: (callback: any) => this.executeInsert(table, data).then(callback),
+        }),
+        update: (data: any) => ({
+          eq: (column: string, value: any) => ({
+            then: (callback: any) => this.executeUpdate(table, data, column, value).then(callback),
+          }),
+        }),
+      }
+
+      return builder
+    }
+
+    return createQueryBuilder()
+  }
+
+  private async executeQuery(table: string, query: string, filters: string[]) {
+    try {
+      const filterQuery = filters.length > 0 ? `&${filters.join("&")}` : ""
+      const url = `${this.baseUrl}/rest/v1/${table}?${query}${filterQuery}`
+
+      const response = await fetch(url, {
+        headers: {
+          apikey: this.apiKey,
+          Authorization: this.session?.access_token ? `Bearer ${this.session.access_token}` : "",
+        },
+      })
+
+      const data = await response.json()
+      return { data: response.ok ? data : [], error: response.ok ? null : data }
+    } catch (error) {
+      return { data: [], error: { message: "Network error during query" } }
+    }
+  }
+
+  private async executeInsert(table: string, data: any) {
+    try {
+      const response = await fetch(`${this.baseUrl}/rest/v1/${table}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this.apiKey,
+          Authorization: this.session?.access_token ? `Bearer ${this.session.access_token}` : "",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      return { data: response.ok ? result : null, error: response.ok ? null : result }
+    } catch (error) {
+      return { data: null, error: { message: "Network error during insert" } }
+    }
+  }
+
+  private async executeUpdate(table: string, data: any, column: string, value: any) {
+    try {
+      const response = await fetch(`${this.baseUrl}/rest/v1/${table}?${column}=eq.${value}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: this.apiKey,
+          Authorization: this.session?.access_token ? `Bearer ${this.session.access_token}` : "",
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      return { data: response.ok ? result : null, error: response.ok ? null : result }
+    } catch (error) {
+      return { data: null, error: { message: "Network error during update" } }
+    }
   }
 }
 
 export function createClient() {
-  return createMockClient() as any
+  const url = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    console.error("Missing Supabase environment variables")
+    return null
+  }
+
+  return new CustomSupabaseClient(url, key)
 }
