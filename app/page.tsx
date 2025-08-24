@@ -198,18 +198,18 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg">
                 <div className="text-4xl font-bold text-primary mb-2">12</div>
-                <div className="text-base font-medium text-foreground mb-1">New Boxes Installed</div>
+                <div className="text-base font-medium text-foreground mb-1">New NestBox Installed</div>
                 <div className="text-sm text-muted-foreground">(This Season)</div>
               </div>
               <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg">
                 <div className="text-4xl font-bold text-primary mb-2">47</div>
-                <div className="text-base font-medium text-foreground mb-1">Active Boxes</div>
+                <div className="text-base font-medium text-foreground mb-1">Active NestBox</div>
                 <div className="text-sm text-muted-foreground">(All Time)</div>
               </div>
               <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg">
                 <div className="text-4xl font-bold text-primary mb-2">23</div>
                 <div className="text-base font-medium text-foreground mb-1">Volunteers</div>
-                <div className="text-sm text-muted-foreground">Active Members</div>
+                <div className="text-sm text-muted-foreground">(Active Members)</div>
               </div>
             </div>
           </div>

@@ -161,7 +161,7 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
                       placeholder="••••••••"
                       value={loginData.password}
                       onChange={(e) => setLoginData((prev) => ({ ...prev, password: e.target.value }))}
-                      className="pl-10"
+                      className="pl-10 shadow-sm"
                       required
                     />
                   </div>
