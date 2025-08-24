@@ -151,6 +151,7 @@ class CustomSupabaseClient implements SupabaseClient {
               filters.push(`${column}=eq.${value}`)
               return {
                 ...builder,
+                single: () => this.executeSingleQuery(table, query, filters),
                 order: (column: string, options?: { ascending?: boolean }) => {
                   const direction = options?.ascending === false ? "desc" : "asc"
                   query += `&order=${column}.${direction}`
@@ -241,6 +242,32 @@ class CustomSupabaseClient implements SupabaseClient {
       return { data: response.ok ? result : null, error: response.ok ? null : result }
     } catch (error) {
       return { data: null, error: { message: "Network error during update" } }
+    }
+  }
+
+  private async executeSingleQuery(table: string, query: string, filters: string[]) {
+    try {
+      const filterQuery = filters.length > 0 ? `&${filters.join("&")}` : ""
+      const url = `${this.baseUrl}/rest/v1/${table}?${query}${filterQuery}`
+
+      const response = await fetch(url, {
+        headers: {
+          apikey: this.apiKey,
+          Authorization: this.session?.access_token ? `Bearer ${this.session.access_token}` : "",
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Return first item for single() queries, or null if no results
+        const result = Array.isArray(data) ? data[0] || null : data
+        return { data: result, error: null }
+      } else {
+        return { data: null, error: data }
+      }
+    } catch (error) {
+      return { data: null, error: { message: "Network error during single query" } }
     }
   }
 }
