@@ -1,41 +1,33 @@
-import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const supabaseResponse = NextResponse.next({
     request,
   })
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL!,
-    process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
-        },
-      },
-    },
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL!
+  const supabaseKey = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY!
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Get session from cookies
+  const sessionCookie = request.cookies.get("sb-access-token")
+  let user = null
 
-  // IMPORTANT: If you remove getUser() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  if (sessionCookie) {
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          Authorization: `Bearer ${sessionCookie.value}`,
+          apikey: supabaseKey,
+        },
+      })
+
+      if (response.ok) {
+        user = await response.json()
+      }
+    } catch (error) {
+      console.error("User validation error:", error)
+    }
+  }
 
   // Only redirect to auth for protected routes
   if (
@@ -44,12 +36,10 @@ export async function updateSession(request: NextRequest) {
       request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/nest-check"))
   ) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = "/auth"
     return NextResponse.redirect(url)
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
   return supabaseResponse
 }
