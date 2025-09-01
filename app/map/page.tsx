@@ -1,25 +1,29 @@
-import { NestBoxMap } from "@/components/nestbox-map"
+import MapComponent from '@/components/map/MapComponent';
 
 export default function MapPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
-      <header className="border-b border-emerald-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-serif text-2xl font-bold text-emerald-900">Explore NestBox</h1>
-              <p className="text-sm text-emerald-700">Discover and monitor nest boxes in your community</p>
-            </div>
-            <a href="/" className="text-emerald-600 hover:text-emerald-800 transition-colors">
-              ← Back to Home
-            </a>
-          </div>
-        </div>
-      </header>
+  // Example markers - replace with your actual nest box locations
+  const nestBoxMarkers = [
+    {
+      position: { lat: 40.7128, lng: -74.0060 },
+      title: 'Nest Box #1',
+    },
+    {
+      position: { lat: 40.7209, lng: -74.0007 },
+      title: 'Nest Box #2',
+    },
+  ];
 
-      <main className="container mx-auto px-4 py-8">
-        <NestBoxMap />
-      </main>
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Nest Box Locations</h1>
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <MapComponent 
+          center={{ lat: 40.7128, lng: -74.0060 }}
+          zoom={13}
+          markers={nestBoxMarkers}
+          className="h-[600px] w-full rounded-lg border"
+        />
+      </div>
     </div>
-  )
+  );
 }
