@@ -116,10 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/auth/callback?next=/dashboard`,
           data: {
-            full_name: userData.fullName || "",
-            username: userData.username || email.split("@")[0],
+            full_name: `${userData.firstName} ${userData.lastName}`,
+            role: userData.role || "volunteer",
+            phone: userData.phone || "",
           },
         },
       })
@@ -128,13 +131,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message }
       }
 
-      // Profile will be created automatically by the trigger
-      if (data.user) {
-        await fetchUserProfile(data.user.id)
-      }
+      // Profile will be created automatically by the trigger after email confirmation
+      console.log("[v0] Signup successful, user needs to confirm email:", data.user?.email)
 
       return {}
     } catch (error) {
+      console.error("[v0] Signup exception:", error)
       return { error: "Signup failed" }
     } finally {
       setLoading(false)
