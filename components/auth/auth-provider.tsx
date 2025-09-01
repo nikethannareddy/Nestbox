@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("user_id", userId)
         .single()
-
+8
       if (error) {
         console.error("Error fetching user profile:", error)
         return

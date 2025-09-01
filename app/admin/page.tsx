@@ -27,57 +27,103 @@ import {
   Loader2,
 } from "lucide-react"
 
+// Updated interfaces to match the database schema
 interface NestBox {
-  id: string
-  name: string
-  description: string
-  latitude: number
-  longitude: number
-  status: string
-  qr_code_url: string
-  installation_date: string
-  box_type: string
-  habitat_type: string
-  target_species: string[]
-  entrance_hole_size: number
-  height_from_ground: number
-  facing_direction: string
-  created_at: string
-  updated_at: string
+  id: string;
+  name: string;
+  description?: string;
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  box_type: 'standard' | 'bluebird' | 'wren' | 'chickadee' | 'platform';
+  entrance_hole_size?: number;
+  floor_dimensions?: string;
+  height_from_ground?: number;
+  facing_direction?: string;
+  habitat_type?: string;
+  target_species: string[];
+  installation_date?: string;
+  installer_name?: string;
+  sponsor_id?: string;
+  sponsor_message?: string;
+  status: 'active' | 'inactive' | 'maintenance_needed' | 'removed';
+  last_maintenance?: string;
+  maintenance_notes?: string;
+  qr_code?: string;
+  photo_url?: string;
+  accessibility_notes?: string;
+  monitoring_frequency?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Profile {
-  id: string
-  full_name: string
-  email: string
-  role: string
-  phone?: string
-  is_admin: boolean
-  created_at: string
-  updated_at: string
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  role: 'volunteer' | 'admin' | 'sponsor' | 'guest';
+  bio?: string;
+  location?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  volunteer_since?: string;
+  total_observations: number;
+  total_maintenance_tasks: number;
+  preferred_contact_method: 'email' | 'phone' | 'both';
+  notifications_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ActivityLog {
-  id: string
-  nest_box_id: string
-  volunteer_id: string
-  observation_date: string
-  maintenance_needed: boolean
-  maintenance_notes?: string
+  id: string;
+  nest_box_id: string;
+  volunteer_id: string;
+  observation_date: string;
+  visit_duration?: number;
+  weather_conditions?: string;
+  temperature?: number;
+  nest_stage?: 'empty' | 'building' | 'eggs' | 'chicks' | 'fledged' | 'abandoned';
+  species_observed?: string;
+  adult_count: number;
+  egg_count: number;
+  chick_count: number;
+  estimated_chick_age?: number;
+  behavior_notes?: string;
+  predator_evidence: boolean;
+  predator_type?: string;
+  parasites_observed: boolean;
+  parasite_type?: string;
+  nest_material_notes?: string;
+  photos: string[];
+  maintenance_needed: boolean;
+  maintenance_type?: string;
+  maintenance_notes?: string;
+  maintenance_urgency?: 'low' | 'medium' | 'high' | 'urgent';
+  verified: boolean;
+  verified_by?: string;
+  verified_at?: string;
+  created_at: string;
 }
 
 interface VolunteerAssignment {
-  id: string
-  nest_box_id: string
-  volunteer_id: string
-  status: string
-  assignment_type: string
-  assigned_date: string
-  description: string
-  priority: string
-  completion_date?: string
-  created_at: string
-  updated_at: string
+  id: string;
+  nest_box_id: string;
+  volunteer_id: string;
+  assigned_by?: string;
+  assignment_type: 'monitoring' | 'maintenance' | 'installation' | 'removal';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  description?: string;
+  assigned_date: string;
+  due_date?: string;
+  status: 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  completion_date?: string;
+  completion_notes?: string;
+  estimated_hours?: number;
+  actual_hours?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function AdminDashboard() {
