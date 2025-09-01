@@ -59,15 +59,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log("[v0] Fetching profile for user:", userId)
-      const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+      const { data: profiles, error } = await supabase.from("profiles").select("*").eq("id", userId)
 
-      console.log("[v0] Profile fetch response:", { profile: !!profile, error: error?.message || null })
+      console.log("[v0] Profile fetch response:", { profile: !!profiles?.length, error: error?.message || null })
 
       if (error) {
         console.error("[v0] Error fetching user profile:", error)
         return
       }
 
+      if (!profiles || profiles.length === 0) {
+        console.log("[v0] No profile found for user, profile may not be created yet")
+        return
+      }
+
+      if (profiles.length > 1) {
+        console.warn("[v0] Multiple profiles found for user, using the first one")
+      }
+
+      const profile = profiles[0]
       console.log("[v0] Profile fetched successfully:", profile?.email || "unknown")
       setUser(profile)
     } catch (error) {
