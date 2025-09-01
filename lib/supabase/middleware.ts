@@ -1,45 +1,57 @@
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  const supabaseResponse = NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request,
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY!
-
-  // Get session from cookies
-  const sessionCookie = request.cookies.get("sb-access-token")
-  let user = null
-
-  if (sessionCookie) {
-    try {
-      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-        headers: {
-          Authorization: `Bearer ${sessionCookie.value}`,
-          apikey: supabaseKey,
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL!,
+    process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
         },
-      })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        },
+      },
+    },
+  )
 
-      if (response.ok) {
-        user = await response.json()
-      }
-    } catch (error) {
-      console.error("User validation error:", error)
-    }
-  }
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
 
-  // Only redirect to auth for protected routes
-  if (
-    !user &&
-    (request.nextUrl.pathname.startsWith("/admin") ||
-      request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/nest-check"))
-  ) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user && !request.nextUrl.pathname.startsWith("/auth") && !request.nextUrl.pathname.startsWith("/api")) {
+    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = "/auth"
     return NextResponse.redirect(url)
   }
+
+  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
+  // creating a new response object with NextResponse.next() make sure to:
+  // 1. Pass the request in it, like so:
+  //    const myNewResponse = NextResponse.next({ request })
+  // 2. Copy over the cookies, like so:
+  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
+  // 3. Change the myNewResponse object to fit your needs, but avoid changing
+  //    the cookies!
+  // 4. Finally:
+  //    return myNewResponse
+  // If this is not done, you may be causing the browser and server to go out
+  // of sync and terminate the user's session prematurely!
 
   return supabaseResponse
 }
