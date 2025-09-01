@@ -57,11 +57,11 @@ export interface Database {
           installation_date: string
           installer_name: string | null
           status: "active" | "inactive" | "maintenance" | "removed"
+          needs_maintenance: boolean
+          is_public: boolean
+          qr_code: string | null
           last_maintenance: string | null
           maintenance_notes: string | null
-          qr_code: string | null
-          sponsor_id: string | null
-          sponsor_message: string | null
           photo_url: string | null
           created_at: string
           updated_at: string
@@ -78,11 +78,11 @@ export interface Database {
           installation_date?: string
           installer_name?: string | null
           status?: "active" | "inactive" | "maintenance" | "removed"
+          needs_maintenance?: boolean
+          is_public?: boolean
+          qr_code?: string | null
           last_maintenance?: string | null
           maintenance_notes?: string | null
-          qr_code?: string | null
-          sponsor_id?: string | null
-          sponsor_message?: string | null
           photo_url?: string | null
         }
         Update: {
@@ -95,11 +95,11 @@ export interface Database {
           target_species?: string[]
           installer_name?: string | null
           status?: "active" | "inactive" | "maintenance" | "removed"
+          needs_maintenance?: boolean
+          is_public?: boolean
+          qr_code?: string | null
           last_maintenance?: string | null
           maintenance_notes?: string | null
-          qr_code?: string | null
-          sponsor_id?: string | null
-          sponsor_message?: string | null
           photo_url?: string | null
           updated_at?: string
         }
@@ -117,7 +117,7 @@ export interface Database {
           chick_count: number
           weather_conditions: string | null
           temperature: number | null
-          maintenance_needed: boolean
+          maintenance_required: boolean
           maintenance_type: string | null
           maintenance_urgency: "low" | "medium" | "high" | "urgent" | null
           notes: string | null
@@ -139,7 +139,7 @@ export interface Database {
           chick_count?: number
           weather_conditions?: string | null
           temperature?: number | null
-          maintenance_needed?: boolean
+          maintenance_required?: boolean
           maintenance_type?: string | null
           maintenance_urgency?: "low" | "medium" | "high" | "urgent" | null
           notes?: string | null
@@ -157,7 +157,7 @@ export interface Database {
           chick_count?: number
           weather_conditions?: string | null
           temperature?: number | null
-          maintenance_needed?: boolean
+          maintenance_required?: boolean
           maintenance_type?: string | null
           maintenance_urgency?: "low" | "medium" | "high" | "urgent" | null
           notes?: string | null
@@ -218,11 +218,10 @@ export interface Database {
       sponsors: {
         Row: {
           id: string
-          profile_id: string | null
-          organization_name: string | null
-          contact_person: string | null
-          contact_email: string | null
-          contact_phone: string | null
+          name: string
+          email: string | null
+          phone: string | null
+          organization: string | null
           sponsorship_level: "basic" | "premium" | "corporate"
           annual_contribution: number | null
           is_memorial: boolean
@@ -236,11 +235,10 @@ export interface Database {
         }
         Insert: {
           id?: string
-          profile_id?: string | null
-          organization_name?: string | null
-          contact_person?: string | null
-          contact_email?: string | null
-          contact_phone?: string | null
+          name: string
+          email?: string | null
+          phone?: string | null
+          organization?: string | null
           sponsorship_level?: "basic" | "premium" | "corporate"
           annual_contribution?: number | null
           is_memorial?: boolean
@@ -251,10 +249,10 @@ export interface Database {
           public_recognition?: boolean
         }
         Update: {
-          organization_name?: string | null
-          contact_person?: string | null
-          contact_email?: string | null
-          contact_phone?: string | null
+          name?: string
+          email?: string | null
+          phone?: string | null
+          organization?: string | null
           sponsorship_level?: "basic" | "premium" | "corporate"
           annual_contribution?: number | null
           is_memorial?: boolean
@@ -266,12 +264,79 @@ export interface Database {
           updated_at?: string
         }
       }
+      sponsorships: {
+        Row: {
+          id: string
+          sponsor_id: string
+          nest_box_id: string
+          amount: number
+          start_date: string
+          end_date: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sponsor_id: string
+          nest_box_id: string
+          amount: number
+          start_date?: string
+          end_date?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          amount?: number
+          start_date?: string
+          end_date?: string | null
+          is_active?: boolean
+          updated_at?: string
+        }
+      }
+      educational_content: {
+        Row: {
+          id: string
+          title: string
+          content: string
+          content_type: "guide" | "tutorial" | "article" | "video"
+          category: string
+          difficulty_level: "beginner" | "intermediate" | "advanced"
+          estimated_read_time: number | null
+          featured_image: string | null
+          is_published: boolean
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content: string
+          content_type?: "guide" | "tutorial" | "article" | "video"
+          category: string
+          difficulty_level?: "beginner" | "intermediate" | "advanced"
+          estimated_read_time?: number | null
+          featured_image?: string | null
+          is_published?: boolean
+          created_by: string
+        }
+        Update: {
+          title?: string
+          content?: string
+          content_type?: "guide" | "tutorial" | "article" | "video"
+          category?: string
+          difficulty_level?: "beginner" | "intermediate" | "advanced"
+          estimated_read_time?: number | null
+          featured_image?: string | null
+          is_published?: boolean
+          updated_at?: string
+        }
+      }
       notifications: {
         Row: {
           id: string
-          recipient_id: string
-          sender_id: string | null
-          type: "maintenance" | "assignment" | "observation" | "system" | "welcome"
+          user_id: string
+          type: "maintenance" | "assignment" | "observation" | "system" | "welcome" | "info"
           title: string
           message: string
           related_nest_box_id: string | null
@@ -283,9 +348,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          recipient_id: string
-          sender_id?: string | null
-          type: "maintenance" | "assignment" | "observation" | "system" | "welcome"
+          user_id: string
+          type: "maintenance" | "assignment" | "observation" | "system" | "welcome" | "info"
           title: string
           message: string
           related_nest_box_id?: string | null
@@ -317,6 +381,8 @@ export type NestBox = Database["public"]["Tables"]["nest_boxes"]["Row"]
 export type ActivityLog = Database["public"]["Tables"]["activity_logs"]["Row"]
 export type VolunteerAssignment = Database["public"]["Tables"]["volunteer_assignments"]["Row"]
 export type Sponsor = Database["public"]["Tables"]["sponsors"]["Row"]
+export type Sponsorship = Database["public"]["Tables"]["sponsorships"]["Row"]
+export type EducationalContent = Database["public"]["Tables"]["educational_content"]["Row"]
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"]
 
 export type UserRole = Profile["role"]

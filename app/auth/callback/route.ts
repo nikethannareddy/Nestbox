@@ -10,6 +10,26 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+        const redirectPath = profile?.role === "admin" ? "/admin" : "/dashboard"
+
+        const forwardedHost = request.headers.get("x-forwarded-host")
+        const isLocalEnv = process.env.NODE_ENV === "development"
+        if (isLocalEnv) {
+          return NextResponse.redirect(`${origin}${redirectPath}`)
+        } else if (forwardedHost) {
+          return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`)
+        } else {
+          return NextResponse.redirect(`${origin}${redirectPath}`)
+        }
+      }
+
+      // Fallback redirect
       const forwardedHost = request.headers.get("x-forwarded-host")
       const isLocalEnv = process.env.NODE_ENV === "development"
       if (isLocalEnv) {
