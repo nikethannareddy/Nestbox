@@ -229,9 +229,14 @@ export function createClient() {
   const url = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_NESTBOXSUPABASE_ANON_KEY
 
+  console.log("[v0] Supabase URL:", url ? "✓ Found" : "✗ Missing")
+  console.log("[v0] Supabase Anon Key:", anonKey ? "✓ Found" : "✗ Missing")
+
   if (!url || !anonKey) {
+    console.error("[v0] Missing Supabase environment variables:", { url: !!url, anonKey: !!anonKey })
     throw new Error("Supabase URL and anon key are required")
   }
 
+  console.log("[v0] Creating custom Supabase client")
   return new SupabaseClient(url, anonKey)
 }
