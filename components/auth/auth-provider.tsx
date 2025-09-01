@@ -31,10 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
+        const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           await fetchUserProfile(session.user.id)
         }
@@ -47,24 +44,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     getInitialSession()
 
-    if (!supabase) {
-      return
-    }
+    if (!supabase) return
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await fetchUserProfile(session.user.id)
-      } else if (event === "SIGNED_OUT") {
-        setUser(null)
+    // Set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          await fetchUserProfile(session.user.id)
+        } else if (event === "SIGNED_OUT") {
+          setUser(null)
+        }
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    )
 
-    return () => subscription.unsubscribe()
-  }, [])
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
+  }, [supabase]) // Add supabase to dependency array
 
   const fetchUserProfile = async (userId: string) => {
     if (!supabase) {

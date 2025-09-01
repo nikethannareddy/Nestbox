@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { NestBoxLogo } from "@/components/nestbox-logo"
+import Link from "next/link"
 import {
   MapPin,
   QrCode,
@@ -487,12 +488,12 @@ export default function AdminDashboard() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
             <p className="text-gray-600 mb-6">You need to be logged in to access the admin dashboard.</p>
-            <a
+            <Link
               href="/auth"
               className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
             >
               Go to Login
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -515,31 +516,34 @@ export default function AdminDashboard() {
       <header className="border-b border-emerald-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <a href="/" className="hover:opacity-80 transition-opacity">
+            <Link href="/" className="hover:opacity-80 transition-opacity">
               <NestBoxLogo />
-            </a>
+            </Link>
             <nav className="hidden md:flex items-center gap-6">
-              <a href="/map" className="text-emerald-700 hover:text-emerald-900 transition-colors">
+              <Link href="/map" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 Explore
-              </a>
-              <a href="/learn" className="text-emerald-700 hover:text-emerald-900 transition-colors">
+              </Link>
+              <Link href="/learn" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 Build
-              </a>
-              <a href="/nest-check" className="text-emerald-700 hover:text-emerald-900 transition-colors">
+              </Link>
+              <Link href="/nest-check" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 Monitor
-              </a>
-              <a href="/about" className="text-emerald-700 hover:text-emerald-900 transition-colors">
+              </Link>
+              <Link href="/about" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 About
-              </a>
+              </Link>
             </nav>
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 className="bg-white/80 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                asChild
               >
-                <User className="h-4 w-4 mr-2" />
-                {user?.full_name || "Admin"}
+                <Link href="/profile">
+                  <User className="h-4 w-4 mr-2" />
+                  {user?.full_name || "Admin"}
+                </Link>
               </Button>
               <Button
                 variant="outline"
