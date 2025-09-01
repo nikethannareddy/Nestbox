@@ -1,12 +1,37 @@
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  // Simple middleware that doesn't require Supabase SSR
-  // In a real implementation, this would handle session refresh
-  console.log("[v0] Mock middleware processing request:", request.nextUrl.pathname)
-
-  // For now, just pass through all requests
-  return NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request,
   })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        },
+      },
+    },
+  )
+
+  // This will refresh the session and handle authentication properly
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Optional: Add route protection logic here
+  // For now, we'll just refresh the session and continue
+
+  return supabaseResponse
 }
