@@ -858,7 +858,17 @@ export default function AdminDashboard() {
               </div>
 
               <Button
-                onClick={handleAddBox}
+                onClick={async () => {
+                  console.log("[v0] Button clicked - immediate handler")
+                  console.log("[v0] Current form state:", {
+                    name: newBox.name,
+                    lat: newBox.coordinates.lat,
+                    lng: newBox.coordinates.lng,
+                    isSubmitting,
+                    buttonDisabled: !newBox.name || !newBox.coordinates.lat || !newBox.coordinates.lng || isSubmitting,
+                  })
+                  await handleAddBox()
+                }}
                 className="w-full bg-primary hover:bg-primary/90"
                 disabled={!newBox.name || !newBox.coordinates.lat || !newBox.coordinates.lng || isSubmitting}
               >
