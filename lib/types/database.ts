@@ -51,18 +51,25 @@ export interface Database {
           description: string | null
           latitude: number
           longitude: number
-          location_description: string | null
-          box_type: "standard" | "platform" | "specialty"
+          elevation: number | null
+          box_type: string
+          entrance_hole_size: number | null
+          floor_dimensions: string | null
+          height_from_ground: number | null
+          facing_direction: string | null
+          habitat_type: string | null
           target_species: string[]
-          installation_date: string
+          installation_date: string | null
           installer_name: string | null
-          status: "active" | "inactive" | "maintenance" | "removed"
-          needs_maintenance: boolean
-          is_public: boolean
-          qr_code: string | null
+          sponsor_id: string | null
+          sponsor_message: string | null
+          status: string
           last_maintenance: string | null
           maintenance_notes: string | null
+          qr_code: string | null
           photo_url: string | null
+          accessibility_notes: string | null
+          monitoring_frequency: string | null
           created_at: string
           updated_at: string
         }
@@ -72,35 +79,50 @@ export interface Database {
           description?: string | null
           latitude: number
           longitude: number
-          location_description?: string | null
-          box_type?: "standard" | "platform" | "specialty"
+          elevation?: number | null
+          box_type?: string
+          entrance_hole_size?: number | null
+          floor_dimensions?: string | null
+          height_from_ground?: number | null
+          facing_direction?: string | null
+          habitat_type?: string | null
           target_species?: string[]
-          installation_date?: string
+          installation_date?: string | null
           installer_name?: string | null
-          status?: "active" | "inactive" | "maintenance" | "removed"
-          needs_maintenance?: boolean
-          is_public?: boolean
-          qr_code?: string | null
+          sponsor_id?: string | null
+          sponsor_message?: string | null
+          status?: string
           last_maintenance?: string | null
           maintenance_notes?: string | null
+          qr_code?: string | null
           photo_url?: string | null
+          accessibility_notes?: string | null
+          monitoring_frequency?: string | null
         }
         Update: {
           name?: string
           description?: string | null
           latitude?: number
           longitude?: number
-          location_description?: string | null
-          box_type?: "standard" | "platform" | "specialty"
+          elevation?: number | null
+          box_type?: string
+          entrance_hole_size?: number | null
+          floor_dimensions?: string | null
+          height_from_ground?: number | null
+          facing_direction?: string | null
+          habitat_type?: string | null
           target_species?: string[]
+          installation_date?: string | null
           installer_name?: string | null
-          status?: "active" | "inactive" | "maintenance" | "removed"
-          needs_maintenance?: boolean
-          is_public?: boolean
-          qr_code?: string | null
+          sponsor_id?: string | null
+          sponsor_message?: string | null
+          status?: string
           last_maintenance?: string | null
           maintenance_notes?: string | null
+          qr_code?: string | null
           photo_url?: string | null
+          accessibility_notes?: string | null
+          monitoring_frequency?: string | null
           updated_at?: string
         }
       }

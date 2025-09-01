@@ -103,7 +103,7 @@ export default function TestAuthFlowPage() {
     try {
       const { data: nestBoxes, error } = await supabase
         .from("nest_boxes")
-        .select("id, name, status, is_public")
+        .select("id, name, status") // removed is_public column that doesn't exist
         .limit(5)
 
       if (error) throw error
