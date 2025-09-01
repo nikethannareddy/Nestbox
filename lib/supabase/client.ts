@@ -57,6 +57,7 @@ class SupabaseClient {
         password,
       }: { email: string; password: string }): Promise<SupabaseAuthResponse> => {
         try {
+          console.log("[v0] Attempting sign in for:", email)
           const response = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
             method: "POST",
             headers: {
@@ -66,20 +67,31 @@ class SupabaseClient {
             body: JSON.stringify({ email, password }),
           })
 
+          console.log("[v0] Sign in response status:", response.status)
           const result = await response.json()
+          console.log("[v0] Sign in response data:", {
+            ok: response.ok,
+            hasUser: !!result.user,
+            hasSession: !!result.session,
+            error: result.error || result.message || null,
+          })
 
           if (response.ok) {
             // Store session in localStorage
             if (typeof window !== "undefined") {
               localStorage.setItem("supabase.auth.token", JSON.stringify(result))
+              console.log("[v0] Session stored in localStorage")
             }
             // Trigger auth state change
+            console.log("[v0] Triggering SIGNED_IN event")
             this.authListeners.forEach((listener) => listener("SIGNED_IN", result))
             return { data: result, error: null }
           } else {
+            console.log("[v0] Sign in failed:", result)
             return { data: null, error: result }
           }
         } catch (error) {
+          console.log("[v0] Sign in exception:", error)
           return { data: null, error }
         }
       },
@@ -179,6 +191,8 @@ class QueryBuilder {
     const filterString = this.filters.length > 0 ? `&${this.filters.join("&")}` : ""
     const url = `${this.url}/rest/v1/${this.table}?select=${this.selectFields}${filterString}${this.orderBy}&limit=1`
 
+    console.log("[v0] Database query URL:", url)
+
     try {
       const response = await fetch(url, {
         headers: {
@@ -187,14 +201,23 @@ class QueryBuilder {
         },
       })
 
+      console.log("[v0] Database query response status:", response.status)
       const result = await response.json()
+      console.log("[v0] Database query result:", {
+        ok: response.ok,
+        hasData: !!result,
+        isArray: Array.isArray(result),
+        length: Array.isArray(result) ? result.length : "not array",
+      })
 
       if (response.ok) {
         return { data: result[0] || null, error: null }
       } else {
+        console.log("[v0] Database query failed:", result)
         return { data: null, error: result }
       }
     } catch (error) {
+      console.log("[v0] Database query exception:", error)
       return { data: null, error }
     }
   }

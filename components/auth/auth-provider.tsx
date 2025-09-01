@@ -58,37 +58,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("[v0] Fetching profile for user:", userId)
       const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
+      console.log("[v0] Profile fetch response:", { profile: !!profile, error: error?.message || null })
+
       if (error) {
-        console.error("Error fetching user profile:", error)
+        console.error("[v0] Error fetching user profile:", error)
         return
       }
 
+      console.log("[v0] Profile fetched successfully:", profile?.email || "unknown")
       setUser(profile)
     } catch (error) {
-      console.error("Error fetching user profile:", error)
+      console.error("[v0] Exception fetching user profile:", error)
     }
   }
 
   const login = async (email: string, password: string) => {
     try {
+      console.log("[v0] Login attempt started for:", email)
       setLoading(true)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
+      console.log("[v0] Login response:", { data: !!data, error: error?.message || null })
+
       if (error) {
+        console.log("[v0] Login error:", error)
         return { error: error.message }
       }
 
       if (data.user) {
+        console.log("[v0] User authenticated, fetching profile for:", data.user.id)
         await fetchUserProfile(data.user.id)
+      } else {
+        console.log("[v0] No user data returned from login")
       }
 
+      console.log("[v0] Login completed successfully")
       return {}
     } catch (error) {
+      console.log("[v0] Login exception:", error)
       return { error: "Login failed" }
     } finally {
       setLoading(false)
