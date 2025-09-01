@@ -2,14 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { UserProfile } from "@/lib/types/database"
+import type { Profile } from "@/lib/types/database"
 
 interface AuthContextType {
-  user: UserProfile | null
+  user: Profile | null
   login: (email: string, password: string) => Promise<{ error?: string }>
   signup: (email: string, password: string, userData: any) => Promise<{ error?: string }>
   logout: () => Promise<void>
-  updateUser: (updatedUser: Partial<UserProfile>) => Promise<{ error?: string }>
+  updateUser: (updatedUser: Partial<Profile>) => Promise<{ error?: string }>
   isAuthenticated: boolean
   hasRole: (role: string | string[]) => boolean
   loading: boolean
@@ -18,7 +18,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
+  const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -58,37 +58,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: profile, error } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
+      console.log("[v0] Fetching profile for user:", userId)
+      const { data: profiles, error } = await supabase.from("profiles").select("*").eq("id", userId)
+
+      console.log("[v0] Profile fetch response:", { profile: !!profiles?.length, error: error?.message || null })
 
       if (error) {
-        console.error("Error fetching user profile:", error)
+        console.error("[v0] Error fetching user profile:", error)
         return
       }
 
+      if (!profiles || profiles.length === 0) {
+        console.log("[v0] No profile found for user, profile may not be created yet")
+        return
+      }
+
+      if (profiles.length > 1) {
+        console.warn("[v0] Multiple profiles found for user, using the first one")
+      }
+
+      const profile = profiles[0]
+      console.log("[v0] Profile fetched successfully:", profile?.email || "unknown")
       setUser(profile)
     } catch (error) {
-      console.error("Error fetching user profile:", error)
+      console.error("[v0] Exception fetching user profile:", error)
     }
   }
 
   const login = async (email: string, password: string) => {
     try {
+      console.log("[v0] Login attempt started for:", email)
       setLoading(true)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
+      console.log("[v0] Login response:", { data: !!data, error: error?.message || null })
+
       if (error) {
+        console.log("[v0] Login error:", error)
         return { error: error.message }
       }
 
       if (data.user) {
+        console.log("[v0] User authenticated, fetching profile for:", data.user.id)
         await fetchUserProfile(data.user.id)
+      } else {
+        console.log("[v0] No user data returned from login")
       }
 
+      console.log("[v0] Login completed successfully")
       return {}
     } catch (error) {
+      console.log("[v0] Login exception:", error)
       return { error: "Login failed" }
     } finally {
       setLoading(false)
@@ -102,7 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/auth/callback?next=/dashboard`,
+          data: {
+            full_name: `${userData.firstName} ${userData.lastName}`,
+            role: userData.role || "volunteer",
+            phone: userData.phone || "",
+          },
         },
       })
 
@@ -110,29 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message }
       }
 
-      if (data.user) {
-        // Create user profile in user_profiles table
-        const { error: profileError } = await supabase.from("user_profiles").insert({
-          user_id: data.user.id,
-          email: email,
-          first_name: userData.firstName || "",
-          last_name: userData.lastName || "",
-          phone: userData.phone || null,
-          role: userData.role || "volunteer",
-          bio: userData.bio || null,
-          location: userData.location || null,
-        })
-
-        if (profileError) {
-          console.error("Error creating user profile:", profileError)
-          return { error: "Failed to create user profile" }
-        }
-
-        await fetchUserProfile(data.user.id)
-      }
+      // Profile will be created automatically by the trigger after email confirmation
+      console.log("[v0] Signup successful, user needs to confirm email:", data.user?.email)
 
       return {}
     } catch (error) {
+      console.error("[v0] Signup exception:", error)
       return { error: "Signup failed" }
     } finally {
       setLoading(false)
@@ -154,12 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const updateUser = async (updatedUser: Partial<UserProfile>) => {
+  const updateUser = async (updatedUser: Partial<Profile>) => {
     if (!user) return { error: "No user logged in" }
 
     try {
       const { error } = await supabase
-        .from("user_profiles")
+        .from("profiles")
         .update({
           ...updatedUser,
           updated_at: new Date().toISOString(),

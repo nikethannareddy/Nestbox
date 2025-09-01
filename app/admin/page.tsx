@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +37,23 @@ interface NestBox {
   qr_code: string
   created_at: string
   updated_at: string
+  target_species: string[]
+  elevation?: number
+  entrance_hole_size?: number
+  height_from_ground?: number
+  installation_date?: string
+  sponsor_id?: string
+  floor_dimensions?: string
+  box_type?: string
+  monitoring_frequency?: string
+  accessibility_notes?: string
+  photo_url?: string
+  maintenance_notes?: string
+  last_maintenance?: string
+  sponsor_message?: string
+  installer_name?: string
+  habitat_type?: string
+  facing_direction?: string
 }
 
 interface Profile {
@@ -69,6 +87,7 @@ interface VolunteerAssignment {
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
+  const supabase = createClient()
   const [activeTab, setActiveTab] = useState<
     "overview" | "add" | "manage" | "volunteers" | "maintenance" | "qr-success"
   >("overview")
@@ -83,125 +102,75 @@ export default function AdminDashboard() {
     coordinates: { lat: "", lng: "" },
     description: "",
     photo: null as File | null,
+    targetSpecies: [] as string[],
+    boxType: "",
+    entranceHoleSize: "",
+    heightFromGround: "",
+    facingDirection: "",
+    habitatType: "",
   })
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newlyCreatedBox, setNewlyCreatedBox] = useState<NestBox | null>(null)
 
   useEffect(() => {
-    fetchMockData()
+    fetchRealData()
   }, [])
 
-  const fetchMockData = async () => {
+  const fetchRealData = async () => {
     try {
       setLoading(true)
+      console.log("[v0] Fetching real data from database...")
 
-      // Mock nest boxes data
-      const mockNestBoxes: NestBox[] = [
-        {
-          id: "box-1",
-          name: "Meadow Box A",
-          description: "Located near the meadow entrance",
-          latitude: 42.1234,
-          longitude: -71.5678,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-1`,
-          created_at: "2024-01-15T10:00:00Z",
-          updated_at: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: "box-2",
-          name: "Trail Box B",
-          description: "Along the main hiking trail",
-          latitude: 42.1245,
-          longitude: -71.5689,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-2`,
-          created_at: "2024-01-20T10:00:00Z",
-          updated_at: "2024-01-20T10:00:00Z",
-        },
-        {
-          id: "box-3",
-          name: "Forest Box C",
-          description: "Deep in the forest trail",
-          latitude: 42.1256,
-          longitude: -71.57,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-3`,
-          created_at: "2024-01-25T10:00:00Z",
-          updated_at: "2024-01-25T10:00:00Z",
-        },
-      ]
+      const { data: nestBoxData, error: nestBoxError } = await supabase
+        .from("nest_boxes")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      // Mock volunteers data
-      const mockVolunteers: Profile[] = [
-        {
-          id: "vol-1",
-          full_name: "Jane Smith",
-          email: "jane@example.com",
-          role: "volunteer",
-          phone: "(555) 123-4567",
-          created_at: "2024-01-10T10:00:00Z",
-          updated_at: "2024-01-10T10:00:00Z",
-        },
-        {
-          id: "vol-2",
-          full_name: "Bob Johnson",
-          email: "bob@example.com",
-          role: "volunteer",
-          phone: "(555) 987-6543",
-          created_at: "2024-01-12T10:00:00Z",
-          updated_at: "2024-01-12T10:00:00Z",
-        },
-        {
-          id: "spon-1",
-          full_name: "Sarah Wilson",
-          email: "sarah@example.com",
-          role: "sponsor",
-          created_at: "2024-01-08T10:00:00Z",
-          updated_at: "2024-01-08T10:00:00Z",
-        },
-      ]
+      if (nestBoxError) {
+        console.error("[v0] Error fetching nest boxes:", nestBoxError)
+      } else {
+        console.log("[v0] Fetched nest boxes:", nestBoxData?.length || 0)
+        setNestBoxes(nestBoxData || [])
+      }
 
-      // Mock activity logs with maintenance needed
-      const mockActivityLogs: ActivityLog[] = [
-        {
-          id: "log-1",
-          nest_box_id: "box-1",
-          volunteer_id: "vol-1",
-          observation_date: "2024-12-01T10:00:00Z",
-          maintenance_needed: true,
-          maintenance_notes: "Door hinge needs adjustment",
-        },
-        {
-          id: "log-2",
-          nest_box_id: "box-3",
-          volunteer_id: "vol-2",
-          observation_date: "2024-12-03T10:00:00Z",
-          maintenance_needed: true,
-          maintenance_notes: "Needs cleaning and minor repairs",
-        },
-      ]
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      // Mock assignments
-      const mockAssignments: VolunteerAssignment[] = [
-        {
-          id: "assign-1",
-          nest_box_id: "box-1",
-          volunteer_id: "vol-1",
-          status: "assigned",
-          notes: "Maintenance task assigned",
-          assigned_date: "2024-12-01",
-          created_at: "2024-12-01T10:00:00Z",
-        },
-      ]
+      if (profileError) {
+        console.error("[v0] Error fetching profiles:", profileError)
+      } else {
+        console.log("[v0] Fetched profiles:", profileData?.length || 0)
+        setVolunteers(profileData || [])
+      }
 
-      setNestBoxes(mockNestBoxes)
-      setVolunteers(mockVolunteers)
-      setActivityLogs(mockActivityLogs)
-      setAssignments(mockAssignments)
+      const { data: activityData, error: activityError } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (activityError) {
+        console.error("[v0] Error fetching activity logs:", activityError)
+      } else {
+        console.log("[v0] Fetched activity logs:", activityData?.length || 0)
+        setActivityLogs(activityData || [])
+      }
+
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from("volunteer_assignments")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (assignmentError) {
+        console.error("[v0] Error fetching assignments:", assignmentError)
+      } else {
+        console.log("[v0] Fetched assignments:", assignmentData?.length || 0)
+        setAssignments(assignmentData || [])
+      }
     } catch (error) {
-      console.error("Error fetching data:", error)
+      console.error("[v0] Error fetching data:", error)
     } finally {
       setLoading(false)
     }
@@ -243,37 +212,56 @@ export default function AdminDashboard() {
 
     setIsSubmitting(true)
     try {
-      const newBoxId = `box-${Date.now()}`
-      const nestBoxData: NestBox = {
-        id: newBoxId,
+      console.log("[v0] Adding nest box to database...")
+
+      const nestBoxData = {
         name: newBox.name,
         description: newBox.description,
         latitude: Number.parseFloat(newBox.coordinates.lat),
         longitude: Number.parseFloat(newBox.coordinates.lng),
         status: "active",
-        qr_code: `${window.location.origin}/box/${newBoxId}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        qr_code: `${window.location.origin}/box/${Date.now()}`,
+        target_species: newBox.targetSpecies,
+        box_type: newBox.boxType || null,
+        entrance_hole_size: newBox.entranceHoleSize ? Number.parseFloat(newBox.entranceHoleSize) : null,
+        height_from_ground: newBox.heightFromGround ? Number.parseInt(newBox.heightFromGround) : null,
+        facing_direction: newBox.facingDirection || null,
+        habitat_type: newBox.habitatType || null,
+        installation_date: new Date().toISOString().split("T")[0],
+        installer_name: user.full_name || user.email,
       }
 
-      // Add to local state
-      setNestBoxes([nestBoxData, ...nestBoxes])
-      setNewlyCreatedBox(nestBoxData)
+      const { data, error } = await supabase.from("nest_boxes").insert([nestBoxData]).select().single()
 
-      // Reset form
+      if (error) {
+        console.error("[v0] Error adding nest box:", error)
+        alert(`Error adding nest box: ${error.message}`)
+        return
+      }
+
+      console.log("[v0] Nest box added successfully:", data)
+
+      setNestBoxes([data, ...nestBoxes])
+      setNewlyCreatedBox(data)
+
       setNewBox({
         name: "",
         location: "",
         coordinates: { lat: "", lng: "" },
         description: "",
         photo: null,
+        targetSpecies: [],
+        boxType: "",
+        entranceHoleSize: "",
+        heightFromGround: "",
+        facingDirection: "",
+        habitatType: "",
       })
 
-      // Go to QR success page
       setActiveTab("qr-success")
-      alert("Nest box added successfully! (This is a demo)")
+      alert("Nest box added successfully!")
     } catch (error) {
-      console.error("Error adding nest box:", error)
+      console.error("[v0] Error adding nest box:", error)
       alert("Error adding nest box. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -281,7 +269,6 @@ export default function AdminDashboard() {
   }
 
   const generateQRCodeSVG = (text: string) => {
-    // Simple QR code representation (in real app, use proper QR library)
     return `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="white"/><text x="100" y="100" textAnchor="middle" fontSize="12" fill="black">${text}</text></svg>`
   }
 
@@ -350,7 +337,6 @@ export default function AdminDashboard() {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      // Update role in mock database
       setVolunteers(
         volunteers.map((volunteer) =>
           volunteer.id === userId ? { ...volunteer, role: newRole, updated_at: new Date().toISOString() } : volunteer,
@@ -364,12 +350,10 @@ export default function AdminDashboard() {
     }
   }
 
-  // Get maintenance boxes (boxes that have maintenance needed logs)
   const maintenanceBoxes = nestBoxes.filter((box) =>
     activityLogs.some((log) => log.nest_box_id === box.id && log.maintenance_needed),
   )
 
-  // Get assigned maintenance tasks
   const assignedTasks = assignments.filter((assignment) => assignment.status === "assigned")
 
   if (loading) {
@@ -496,7 +480,6 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="grid gap-6 md:grid-cols-4">
             <Card className="bg-white/80 backdrop-blur-sm border-emerald-200">
@@ -536,7 +519,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Volunteers Management Tab */}
         {activeTab === "volunteers" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -617,7 +599,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Maintenance Management Tab */}
         {activeTab === "maintenance" && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-emerald-900">Maintenance Tasks</h2>
@@ -713,7 +694,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Add Nest Box Tab */}
         {activeTab === "add" && (
           <Card>
             <CardHeader>
@@ -741,6 +721,70 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="boxType">Box Type</Label>
+                  <Input
+                    id="boxType"
+                    value={newBox.boxType}
+                    onChange={(e) => setNewBox({ ...newBox, boxType: e.target.value })}
+                    placeholder="e.g., Standard, Platform, Specialty"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="habitatType">Habitat Type</Label>
+                  <Input
+                    id="habitatType"
+                    value={newBox.habitatType}
+                    onChange={(e) => setNewBox({ ...newBox, habitatType: e.target.value })}
+                    placeholder="e.g., Woodland, Meadow, Garden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="entranceHoleSize">Entrance Hole Size (inches)</Label>
+                  <Input
+                    id="entranceHoleSize"
+                    value={newBox.entranceHoleSize}
+                    onChange={(e) => setNewBox({ ...newBox, entranceHoleSize: e.target.value })}
+                    placeholder="1.25"
+                    type="number"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="heightFromGround">Height from Ground (feet)</Label>
+                  <Input
+                    id="heightFromGround"
+                    value={newBox.heightFromGround}
+                    onChange={(e) => setNewBox({ ...newBox, heightFromGround: e.target.value })}
+                    placeholder="5"
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="facingDirection">Facing Direction</Label>
+                  <select
+                    id="facingDirection"
+                    value={newBox.facingDirection}
+                    onChange={(e) => setNewBox({ ...newBox, facingDirection: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">Select direction...</option>
+                    <option value="North">North</option>
+                    <option value="Northeast">Northeast</option>
+                    <option value="East">East</option>
+                    <option value="Southeast">Southeast</option>
+                    <option value="South">South</option>
+                    <option value="Southwest">Southwest</option>
+                    <option value="West">West</option>
+                    <option value="Northwest">Northwest</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <Label>GPS Coordinates</Label>
                 <div className="flex gap-2 mb-2">
@@ -765,6 +809,8 @@ export default function AdminDashboard() {
                         setNewBox({ ...newBox, coordinates: { ...newBox.coordinates, lat: e.target.value } })
                       }
                       placeholder="42.1237"
+                      type="number"
+                      step="0.000001"
                     />
                   </div>
                   <div>
@@ -776,6 +822,8 @@ export default function AdminDashboard() {
                         setNewBox({ ...newBox, coordinates: { ...newBox.coordinates, lng: e.target.value } })
                       }
                       placeholder="-71.1786"
+                      type="number"
+                      step="0.000001"
                     />
                   </div>
                 </div>
@@ -825,7 +873,6 @@ export default function AdminDashboard() {
           </Card>
         )}
 
-        {/* QR Success Tab */}
         {activeTab === "qr-success" && newlyCreatedBox && (
           <Card>
             <CardHeader>
@@ -861,7 +908,6 @@ export default function AdminDashboard() {
           </Card>
         )}
 
-        {/* Manage Boxes Tab */}
         {activeTab === "manage" && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-foreground">Existing Nest Boxes</h2>
