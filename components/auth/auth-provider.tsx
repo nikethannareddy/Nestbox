@@ -73,20 +73,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .single()
-8
+      console.log("[v0] Fetching user profile for:", userId)
+      const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+
       if (error) {
-        console.error("Error fetching user profile:", error)
+        console.error("[v0] Error fetching user profile:", error)
+
+        if (error.code === "PGRST116") {
+          // No rows returned
+          console.log("[v0] Profile not found, attempting to create from auth data...")
+          await createProfileFromAuthUser(userId)
+          return
+        }
         return
       }
 
+      console.log("[v0] Successfully fetched user profile:", profile)
       setUser(profile)
     } catch (error) {
-      console.error("Error fetching user profile:", error)
+      console.error("[v0] Error fetching user profile:", error)
+    }
+  }
+
+  const createProfileFromAuthUser = async (userId: string) => {
+    if (!supabase) return
+
+    try {
+      // Get user data from auth
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        console.error("[v0] Error getting auth user:", authError)
+        return
+      }
+
+      console.log("[v0] Creating profile from auth user data:", user)
+
+      // Create profile manually
+      const { data: newProfile, error: insertError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          full_name: user.user_metadata?.full_name || "",
+          email: user.email || "",
+          phone: user.user_metadata?.phone || null,
+          role: user.user_metadata?.role || "volunteer",
+          is_admin: user.user_metadata?.role === "admin",
+          is_superuser: false,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("[v0] Error creating profile:", insertError)
+        return
+      }
+
+      console.log("[v0] Successfully created profile:", newProfile)
+      setUser(newProfile)
+    } catch (error) {
+      console.error("[v0] Error creating profile from auth user:", error)
     }
   }
 
@@ -130,6 +179,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         options: {
           emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+          data: {
+            full_name: `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
+            first_name: userData.firstName || "",
+            last_name: userData.lastName || "",
+            phone: userData.phone || null,
+            role: userData.role || "volunteer",
+          },
         },
       })
 
@@ -137,26 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message }
       }
 
-      if (data.user) {
-        // Create user profile in user_profiles table
-        const { error: profileError } = await supabase.from("user_profiles").insert({
-          user_id: data.user.id,
-          email: email,
-          first_name: userData.firstName || "",
-          last_name: userData.lastName || "",
-          phone: userData.phone || null,
-          role: userData.role || "volunteer",
-          bio: userData.bio || null,
-          location: userData.location || null,
-        })
-
-        if (profileError) {
-          console.error("Error creating user profile:", profileError)
-          return { error: "Failed to create user profile" }
-        }
-
-        await fetchUserProfile(data.user.id)
-      }
+      // Profile creation will happen via database trigger after email confirmation
 
       return {}
     } catch (error) {
@@ -196,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const { error } = await supabase
-        .from("user_profiles")
+        .from("profiles")
         .update({
           ...updatedUser,
           updated_at: new Date().toISOString(),

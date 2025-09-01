@@ -26,108 +26,109 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react"
+import { AlertCircle } from "lucide-react" // Import AlertCircle
 
 // Updated interfaces to match the database schema
 interface NestBox {
-  id: string;
-  name: string;
-  description?: string;
-  latitude: number;
-  longitude: number;
-  elevation?: number;
-  box_type: 'standard' | 'bluebird' | 'wren' | 'chickadee' | 'platform';
-  entrance_hole_size?: number;
-  floor_dimensions?: string;
-  height_from_ground?: number;
-  facing_direction?: string;
-  habitat_type?: string;
-  target_species: string[];
-  installation_date?: string;
-  installer_name?: string;
-  sponsor_id?: string;
-  sponsor_message?: string;
-  status: 'active' | 'inactive' | 'maintenance_needed' | 'removed';
-  last_maintenance?: string;
-  maintenance_notes?: string;
-  qr_code?: string;
-  photo_url?: string;
-  accessibility_notes?: string;
-  monitoring_frequency?: string;
-  created_at: string;
-  updated_at: string;
+  id: string
+  name: string
+  description?: string
+  latitude: number
+  longitude: number
+  elevation?: number
+  box_type: "standard" | "bluebird" | "wren" | "chickadee" | "platform"
+  entrance_hole_size?: number
+  floor_dimensions?: string
+  height_from_ground?: number
+  facing_direction?: string
+  habitat_type?: string
+  target_species: string[]
+  installation_date?: string
+  installer_name?: string
+  sponsor_id?: string
+  sponsor_message?: string
+  status: "active" | "inactive" | "maintenance_needed" | "removed"
+  last_maintenance?: string
+  maintenance_notes?: string
+  qr_code?: string
+  photo_url?: string
+  accessibility_notes?: string
+  monitoring_frequency?: string
+  created_at: string
+  updated_at: string
 }
 
 interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  phone?: string;
-  role: 'volunteer' | 'admin' | 'sponsor' | 'guest';
-  bio?: string;
-  location?: string;
-  emergency_contact?: string;
-  emergency_phone?: string;
-  volunteer_since?: string;
-  total_observations: number;
-  total_maintenance_tasks: number;
-  preferred_contact_method: 'email' | 'phone' | 'both';
-  notifications_enabled: boolean;
-  created_at: string;
-  updated_at: string;
+  id: string
+  full_name: string
+  email: string
+  phone?: string
+  role: "volunteer" | "admin" | "sponsor" | "guest"
+  bio?: string
+  location?: string
+  emergency_contact?: string
+  emergency_phone?: string
+  volunteer_since?: string
+  total_observations: number
+  total_maintenance_tasks: number
+  preferred_contact_method: "email" | "phone" | "both"
+  notifications_enabled: boolean
+  created_at: string
+  updated_at: string
 }
 
 interface ActivityLog {
-  id: string;
-  nest_box_id: string;
-  volunteer_id: string;
-  observation_date: string;
-  visit_duration?: number;
-  weather_conditions?: string;
-  temperature?: number;
-  nest_stage?: 'empty' | 'building' | 'eggs' | 'chicks' | 'fledged' | 'abandoned';
-  species_observed?: string;
-  adult_count: number;
-  egg_count: number;
-  chick_count: number;
-  estimated_chick_age?: number;
-  behavior_notes?: string;
-  predator_evidence: boolean;
-  predator_type?: string;
-  parasites_observed: boolean;
-  parasite_type?: string;
-  nest_material_notes?: string;
-  photos: string[];
-  maintenance_needed: boolean;
-  maintenance_type?: string;
-  maintenance_notes?: string;
-  maintenance_urgency?: 'low' | 'medium' | 'high' | 'urgent';
-  verified: boolean;
-  verified_by?: string;
-  verified_at?: string;
-  created_at: string;
+  id: string
+  nest_box_id: string
+  volunteer_id: string
+  observation_date: string
+  visit_duration?: number
+  weather_conditions?: string
+  temperature?: number
+  nest_stage?: "empty" | "building" | "eggs" | "chicks" | "fledged" | "abandoned"
+  species_observed?: string
+  adult_count: number
+  egg_count: number
+  chick_count: number
+  estimated_chick_age?: number
+  behavior_notes?: string
+  predator_evidence: boolean
+  predator_type?: string
+  parasites_observed: boolean
+  parasite_type?: string
+  nest_material_notes?: string
+  photos: string[]
+  maintenance_needed: boolean
+  maintenance_type?: string
+  maintenance_notes?: string
+  maintenance_urgency?: "low" | "medium" | "high" | "urgent"
+  verified: boolean
+  verified_by?: string
+  verified_at?: string
+  created_at: string
 }
 
 interface VolunteerAssignment {
-  id: string;
-  nest_box_id: string;
-  volunteer_id: string;
-  assigned_by?: string;
-  assignment_type: 'monitoring' | 'maintenance' | 'installation' | 'removal';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  description?: string;
-  assigned_date: string;
-  due_date?: string;
-  status: 'assigned' | 'in_progress' | 'completed' | 'cancelled';
-  completion_date?: string;
-  completion_notes?: string;
-  estimated_hours?: number;
-  actual_hours?: number;
-  created_at: string;
-  updated_at: string;
+  id: string
+  nest_box_id: string
+  volunteer_id: string
+  assigned_by?: string
+  assignment_type: "monitoring" | "maintenance" | "installation" | "removal"
+  priority: "low" | "medium" | "high" | "urgent"
+  description?: string
+  assigned_date: string
+  due_date?: string
+  status: "assigned" | "in_progress" | "completed" | "cancelled"
+  completion_date?: string
+  completion_notes?: string
+  estimated_hours?: number
+  actual_hours?: number
+  created_at: string
+  updated_at: string
 }
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<
     "overview" | "add" | "manage" | "volunteers" | "maintenance" | "qr-success"
   >("overview")
@@ -286,11 +287,7 @@ export default function AdminDashboard() {
 
       console.log("[v0] Attempting to insert into database:", nestBoxData)
 
-      const { data, error } = await supabase
-        .from("nest_boxes")
-        .insert([nestBoxData])
-        .select()
-        .single()
+      const { data, error } = await supabase.from("nest_boxes").insert([nestBoxData]).select().single()
 
       if (error) {
         console.error("[v0] Database error:", error)
@@ -328,7 +325,6 @@ export default function AdminDashboard() {
       // Go to QR success page
       setActiveTab("qr-success")
       console.log("[v0] Nest box added and form reset successfully")
-
     } catch (error) {
       console.error("[v0] Error in handleAddBox:", error)
       throw error // Re-throw to be caught by the button's error handling
@@ -469,6 +465,39 @@ export default function AdminDashboard() {
 
   // Get assigned maintenance tasks
   const assignedTasks = assignments.filter((assignment) => assignment.status === "assigned")
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <span className="text-emerald-700">Checking authentication...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto p-6">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-6">You need to be logged in to access the admin dashboard.</p>
+            <a
+              href="/auth"
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Go to Login
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -648,7 +677,7 @@ export default function AdminDashboard() {
               <Card key={volunteer.id} className="bg-white/80 backdrop-blur-sm border-emerald-200">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex gap-4">
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                         <User className="w-6 h-6 text-emerald-600" />
                       </div>
@@ -913,14 +942,14 @@ export default function AdminDashboard() {
                     lng: newBox.coordinates.lng,
                     isSubmitting,
                     hasRequiredFields: newBox.name && newBox.coordinates.lat && newBox.coordinates.lng,
-                    user: user ? 'authenticated' : 'not authenticated'
+                    user: user ? "authenticated" : "not authenticated",
                   })
 
                   try {
                     await handleAddBox()
                   } catch (error) {
                     console.error("[v0] Form submission failed:", error)
-                    alert('Failed to add nest box. Please check console for details.')
+                    alert("Failed to add nest box. Please check console for details.")
                   }
                 }}
                 className="w-full bg-primary hover:bg-primary/90"
