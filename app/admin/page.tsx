@@ -202,21 +202,24 @@ export default function AdminDashboard() {
   }
 
   const handleAddBox = async () => {
-    // Bypass auth check for development
-    // if (!user) {
-    //   console.error("[v0] No authenticated user found");
-    //   alert('Please sign in to add a nest box');
-    //   return;
-    // }
-
-    const isValid = newBox.name && newBox.coordinates.lat && newBox.coordinates.lng;
-    if (!isValid) {
-      console.error("[v0] Form validation failed");
-      return;
+    if (!user) {
+      console.error("[v0] No authenticated user found")
+      throw new Error("User not authenticated")
     }
 
-    setIsSubmitting(true);
-    console.log("[v0] Starting form submission...");
+    const isValid = newBox.name && newBox.coordinates.lat && newBox.coordinates.lng
+    if (!isValid) {
+      const error = new Error("Missing required fields")
+      console.error("[v0] Form validation failed:", {
+        hasName: !!newBox.name,
+        hasLat: !!newBox.coordinates.lat,
+        hasLng: !!newBox.coordinates.lng,
+      })
+      throw error
+    }
+
+    setIsSubmitting(true)
+    console.log("[v0] Starting form submission...")
 
     try {
       const nestBoxData = {
@@ -233,41 +236,39 @@ export default function AdminDashboard() {
         entrance_hole_size: 1.5,
         height_from_ground: 5,
         facing_direction: "east",
-        // Add a default user ID for development
-        user_id: "dev-user-123"
-      };
+      }
 
-      console.log("[v0] Attempting to insert into database:", nestBoxData);
-      
+      console.log("[v0] Attempting to insert into database:", nestBoxData)
+
       const { data, error } = await supabase
         .from("nest_boxes")
         .insert([nestBoxData])
         .select()
-        .single();
+        .single()
 
       if (error) {
-        console.error("[v0] Database error:", error);
-        throw error;
+        console.error("[v0] Database error:", error)
+        throw error
       }
 
-      console.log("[v0] Successfully inserted nest box:", data);
+      console.log("[v0] Successfully inserted nest box:", data)
 
       // Update QR code URL with the actual ID
-      const updatedQRCode = `${window.location.origin}/box/${data.id}`;
+      const updatedQRCode = `${window.location.origin}/box/${data.id}`
       const { error: updateError } = await supabase
         .from("nest_boxes")
         .update({ qr_code_url: updatedQRCode, qr_code: updatedQRCode })
-        .eq("id", data.id);
+        .eq("id", data.id)
 
       if (updateError) {
-        console.error("[v0] Error updating QR code:", updateError);
-        throw updateError;
+        console.error("[v0] Error updating QR code:", updateError)
+        throw updateError
       }
 
       // Add to local state
-      const updatedBox = { ...data, qr_code_url: updatedQRCode, qr_code: updatedQRCode };
-      setNestBoxes([updatedBox, ...nestBoxes]);
-      setNewlyCreatedBox(updatedBox);
+      const updatedBox = { ...data, qr_code_url: updatedQRCode, qr_code: updatedQRCode }
+      setNestBoxes([updatedBox, ...nestBoxes])
+      setNewlyCreatedBox(updatedBox)
 
       // Reset form
       setNewBox({
@@ -276,16 +277,17 @@ export default function AdminDashboard() {
         coordinates: { lat: "", lng: "" },
         description: "",
         photo: null,
-      });
+      })
 
       // Go to QR success page
-      setActiveTab("qr-success");
-      
+      setActiveTab("qr-success")
+      console.log("[v0] Nest box added and form reset successfully")
+
     } catch (error) {
-      console.error("[v0] Error in handleAddBox:", error);
-      alert('Failed to add nest box. Check console for details.');
+      console.error("[v0] Error in handleAddBox:", error)
+      throw error // Re-throw to be caught by the button's error handling
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
   }
 
@@ -434,7 +436,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
       <header className="border-b border-emerald-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
