@@ -52,43 +52,29 @@ export function NestBoxMap() {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
-        .from("nest_boxes")
-        .select("*")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false })
+      console.log("[v0] Fetching nest boxes from database...")
+
+      const { data, error } = await supabase.from("nest_boxes").select("*").order("created_at", { ascending: false })
+
+      console.log("[v0] Database response:", { data, error })
 
       if (error) {
+        console.error("[v0] Database error:", error)
         throw error
       }
 
-      setNestBoxes(data || [])
+      if (!data || data.length === 0) {
+        console.log("[v0] No nest boxes found in database")
+        setNestBoxes([])
+        return
+      }
+
+      console.log("[v0] Successfully loaded", data.length, "nest boxes from database")
+      setNestBoxes(data)
     } catch (err) {
-      console.error("Error fetching nest boxes:", err)
-      setError("Failed to load nest boxes")
-      setNestBoxes([
-        {
-          id: "mock-1",
-          box_id: "NB001",
-          name: "Oak Grove Box #1",
-          description: "Located in the community park near the oak grove.",
-          box_type: "standard",
-          latitude: 42.1237,
-          longitude: -71.1786,
-          location_name: "Sharon Community Garden",
-          location_description: "Near the main entrance",
-          status: "active",
-          maintenance_status: "good",
-          installation_date: "2024-01-01",
-          target_species: ["Eastern Bluebird"],
-          primary_species: "Eastern Bluebird",
-          is_public: true,
-          featured: false,
-          custom_fields: {},
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-        } as any,
-      ])
+      console.error("[v0] Error fetching nest boxes:", err)
+      setError(`Failed to load nest boxes: ${err instanceof Error ? err.message : "Unknown error"}`)
+      setNestBoxes([])
     } finally {
       setLoading(false)
     }
@@ -98,19 +84,20 @@ export function NestBoxMap() {
     return nestBoxes.filter((box) => {
       const matchesSearch =
         box.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        box.box_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (box.primary_species && box.primary_species.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        box.location_name.toLowerCase().includes(searchTerm.toLowerCase())
+        box.qr_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (box.target_species && box.target_species.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchesStatus = statusFilter === "all" || box.status === statusFilter
-      const matchesSpecies = speciesFilter === "all" || box.primary_species === speciesFilter
+      const matchesSpecies = speciesFilter === "all" || box.target_species.includes(speciesFilter)
 
       return matchesSearch && matchesStatus && matchesSpecies
     })
   }, [nestBoxes, searchTerm, statusFilter, speciesFilter])
 
   const uniqueSpecies = useMemo(() => {
-    const species = nestBoxes.map((box) => box.primary_species).filter((species): species is string => species !== null)
+    const species = nestBoxes
+      .flatMap((box) => box.target_species)
+      .filter((species): species is string => species !== null)
     return [...new Set(species)]
   }, [nestBoxes])
 
@@ -242,7 +229,7 @@ export function NestBoxMap() {
                   const position = positions[index] || positions[0]
 
                   return (
-                    <Link key={box.id} href={`/box/${box.box_id}`}>
+                    <Link key={box.id} href={`/box/${box.qr_code}`}>
                       <div
                         className="absolute cursor-pointer hover:scale-110 transition-transform group"
                         style={position}
@@ -274,22 +261,24 @@ export function NestBoxMap() {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h4 className="font-semibold text-sm">{box.name}</h4>
-                      <p className="text-xs text-muted-foreground">ID: {box.box_id}</p>
+                      <p className="text-xs text-muted-foreground">ID: {box.qr_code}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${statusColors[box.status]}`}></div>
-                      <div className={`w-3 h-3 rounded-full ${maintenanceStatusColors[box.maintenance_status]}`}></div>
+                      <div
+                        className={`w-3 h-3 rounded-full ${maintenanceStatusColors[box.maintenance_status || "good"]}`}
+                      ></div>
                     </div>
                   </div>
 
                   <div className="space-y-1 text-xs mb-3">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Location:</span>
-                      <span className="text-right text-xs">{box.location_name}</span>
+                      <span className="text-right text-xs">{`${box.latitude}, ${box.longitude}`}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Species:</span>
-                      <span>{box.primary_species || "Various"}</span>
+                      <span>{box.target_species.join(", ") || "Various"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Status:</span>
@@ -304,7 +293,7 @@ export function NestBoxMap() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Link href={`/box/${box.box_id}`} className="flex-1">
+                    <Link href={`/box/${box.qr_code}`} className="flex-1">
                       <Button size="sm" className="w-full text-xs bg-amber-600 hover:bg-amber-700">
                         View Details
                       </Button>

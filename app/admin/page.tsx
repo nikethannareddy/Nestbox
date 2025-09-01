@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +34,14 @@ interface NestBox {
   latitude: number
   longitude: number
   status: string
-  qr_code: string
+  qr_code_url: string
+  installation_date: string
+  box_type: string
+  habitat_type: string
+  target_species: string[]
+  entrance_hole_size: number
+  height_from_ground: number
+  facing_direction: string
   created_at: string
   updated_at: string
 }
@@ -44,6 +52,7 @@ interface Profile {
   email: string
   role: string
   phone?: string
+  is_admin: boolean
   created_at: string
   updated_at: string
 }
@@ -62,9 +71,13 @@ interface VolunteerAssignment {
   nest_box_id: string
   volunteer_id: string
   status: string
-  notes?: string
+  assignment_type: string
   assigned_date: string
+  description: string
+  priority: string
+  completion_date?: string
   created_at: string
+  updated_at: string
 }
 
 export default function AdminDashboard() {
@@ -88,120 +101,70 @@ export default function AdminDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newlyCreatedBox, setNewlyCreatedBox] = useState<NestBox | null>(null)
 
+  const supabase = createClient()
+
   useEffect(() => {
-    fetchMockData()
+    fetchDatabaseData()
   }, [])
 
-  const fetchMockData = async () => {
+  const fetchDatabaseData = async () => {
     try {
       setLoading(true)
+      console.log("[v0] Fetching data from database...")
 
-      // Mock nest boxes data
-      const mockNestBoxes: NestBox[] = [
-        {
-          id: "box-1",
-          name: "Meadow Box A",
-          description: "Located near the meadow entrance",
-          latitude: 42.1234,
-          longitude: -71.5678,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-1`,
-          created_at: "2024-01-15T10:00:00Z",
-          updated_at: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: "box-2",
-          name: "Trail Box B",
-          description: "Along the main hiking trail",
-          latitude: 42.1245,
-          longitude: -71.5689,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-2`,
-          created_at: "2024-01-20T10:00:00Z",
-          updated_at: "2024-01-20T10:00:00Z",
-        },
-        {
-          id: "box-3",
-          name: "Forest Box C",
-          description: "Deep in the forest trail",
-          latitude: 42.1256,
-          longitude: -71.57,
-          status: "active",
-          qr_code: `${window.location.origin}/box/box-3`,
-          created_at: "2024-01-25T10:00:00Z",
-          updated_at: "2024-01-25T10:00:00Z",
-        },
-      ]
+      // Fetch nest boxes from database
+      const { data: nestBoxData, error: nestBoxError } = await supabase
+        .from("nest_boxes")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      // Mock volunteers data
-      const mockVolunteers: Profile[] = [
-        {
-          id: "vol-1",
-          full_name: "Jane Smith",
-          email: "jane@example.com",
-          role: "volunteer",
-          phone: "(555) 123-4567",
-          created_at: "2024-01-10T10:00:00Z",
-          updated_at: "2024-01-10T10:00:00Z",
-        },
-        {
-          id: "vol-2",
-          full_name: "Bob Johnson",
-          email: "bob@example.com",
-          role: "volunteer",
-          phone: "(555) 987-6543",
-          created_at: "2024-01-12T10:00:00Z",
-          updated_at: "2024-01-12T10:00:00Z",
-        },
-        {
-          id: "spon-1",
-          full_name: "Sarah Wilson",
-          email: "sarah@example.com",
-          role: "sponsor",
-          created_at: "2024-01-08T10:00:00Z",
-          updated_at: "2024-01-08T10:00:00Z",
-        },
-      ]
+      if (nestBoxError) {
+        console.error("[v0] Error fetching nest boxes:", nestBoxError)
+      } else {
+        console.log("[v0] Fetched nest boxes:", nestBoxData)
+        setNestBoxes(nestBoxData || [])
+      }
 
-      // Mock activity logs with maintenance needed
-      const mockActivityLogs: ActivityLog[] = [
-        {
-          id: "log-1",
-          nest_box_id: "box-1",
-          volunteer_id: "vol-1",
-          observation_date: "2024-12-01T10:00:00Z",
-          maintenance_needed: true,
-          maintenance_notes: "Door hinge needs adjustment",
-        },
-        {
-          id: "log-2",
-          nest_box_id: "box-3",
-          volunteer_id: "vol-2",
-          observation_date: "2024-12-03T10:00:00Z",
-          maintenance_needed: true,
-          maintenance_notes: "Needs cleaning and minor repairs",
-        },
-      ]
+      // Fetch volunteers from profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      // Mock assignments
-      const mockAssignments: VolunteerAssignment[] = [
-        {
-          id: "assign-1",
-          nest_box_id: "box-1",
-          volunteer_id: "vol-1",
-          status: "assigned",
-          notes: "Maintenance task assigned",
-          assigned_date: "2024-12-01",
-          created_at: "2024-12-01T10:00:00Z",
-        },
-      ]
+      if (profileError) {
+        console.error("[v0] Error fetching profiles:", profileError)
+      } else {
+        console.log("[v0] Fetched profiles:", profileData)
+        setVolunteers(profileData || [])
+      }
 
-      setNestBoxes(mockNestBoxes)
-      setVolunteers(mockVolunteers)
-      setActivityLogs(mockActivityLogs)
-      setAssignments(mockAssignments)
+      // Fetch activity logs
+      const { data: activityData, error: activityError } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (activityError) {
+        console.error("[v0] Error fetching activity logs:", activityError)
+      } else {
+        console.log("[v0] Fetched activity logs:", activityData)
+        setActivityLogs(activityData || [])
+      }
+
+      // Fetch volunteer assignments
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from("volunteer_assignments")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (assignmentError) {
+        console.error("[v0] Error fetching assignments:", assignmentError)
+      } else {
+        console.log("[v0] Fetched assignments:", assignmentData)
+        setAssignments(assignmentData || [])
+      }
     } catch (error) {
-      console.error("Error fetching data:", error)
+      console.error("[v0] Error fetching data:", error)
     } finally {
       setLoading(false)
     }
@@ -241,24 +204,72 @@ export default function AdminDashboard() {
   const handleAddBox = async () => {
     if (!user) return
 
+    console.log("[v0] Add nest box button clicked")
+    console.log("[v0] Form data:", {
+      name: newBox.name,
+      location: newBox.location,
+      coordinates: newBox.coordinates,
+      description: newBox.description,
+    })
+
+    const isValid = newBox.name && newBox.coordinates.lat && newBox.coordinates.lng
+    console.log("[v0] Form validation:", {
+      hasName: !!newBox.name,
+      hasLat: !!newBox.coordinates.lat,
+      hasLng: !!newBox.coordinates.lng,
+      isValid,
+    })
+
+    if (!isValid) {
+      console.log("[v0] Form validation failed - button should be disabled")
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      const newBoxId = `box-${Date.now()}`
-      const nestBoxData: NestBox = {
-        id: newBoxId,
+      console.log("[v0] Adding nest box to database...")
+
+      const nestBoxData = {
         name: newBox.name,
         description: newBox.description,
         latitude: Number.parseFloat(newBox.coordinates.lat),
         longitude: Number.parseFloat(newBox.coordinates.lng),
         status: "active",
-        qr_code: `${window.location.origin}/box/${newBoxId}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        qr_code_url: `${window.location.origin}/box/`, // Will be updated after insertion
+        installation_date: new Date().toISOString().split("T")[0],
+        box_type: "standard",
+        habitat_type: "mixed",
+        target_species: ["bluebird", "chickadee"],
+        entrance_hole_size: 1.5,
+        height_from_ground: 5,
+        facing_direction: "east",
+      }
+
+      const { data, error } = await supabase.from("nest_boxes").insert([nestBoxData]).select().single()
+
+      if (error) {
+        console.error("[v0] Error inserting nest box:", error)
+        alert("Error adding nest box. Please try again.")
+        return
+      }
+
+      console.log("[v0] Successfully added nest box:", data)
+
+      // Update QR code URL with the actual ID
+      const updatedQRCode = `${window.location.origin}/box/${data.id}`
+      const { error: updateError } = await supabase
+        .from("nest_boxes")
+        .update({ qr_code_url: updatedQRCode, qr_code: updatedQRCode })
+        .eq("id", data.id)
+
+      if (updateError) {
+        console.error("[v0] Error updating QR code:", updateError)
       }
 
       // Add to local state
-      setNestBoxes([nestBoxData, ...nestBoxes])
-      setNewlyCreatedBox(nestBoxData)
+      const updatedBox = { ...data, qr_code_url: updatedQRCode, qr_code: updatedQRCode }
+      setNestBoxes([updatedBox, ...nestBoxes])
+      setNewlyCreatedBox(updatedBox)
 
       // Reset form
       setNewBox({
@@ -271,9 +282,9 @@ export default function AdminDashboard() {
 
       // Go to QR success page
       setActiveTab("qr-success")
-      alert("Nest box added successfully! (This is a demo)")
+      alert("Nest box added successfully!")
     } catch (error) {
-      console.error("Error adding nest box:", error)
+      console.error("[v0] Error adding nest box:", error)
       alert("Error adding nest box. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -301,7 +312,7 @@ export default function AdminDashboard() {
           <body>
             <div class="qr-container">
               <h2>NestBox ${box.id.slice(0, 8)}</h2>
-              <div class="qr-code" style="background: url('${generateQRCodeSVG(box.qr_code)}') center/contain no-repeat;"></div>
+              <div class="qr-code" style="background: url('${generateQRCodeSVG(box.qr_code_url)}') center/contain no-repeat;"></div>
               <p><strong>${box.name}</strong></p>
               <p>Lat: ${box.latitude}, Lng: ${box.longitude}</p>
               <p>Scan to log activity</p>
@@ -316,50 +327,91 @@ export default function AdminDashboard() {
 
   const assignMaintenanceTask = async (nestBoxId: string, volunteerId: string) => {
     try {
-      const newAssignment: VolunteerAssignment = {
-        id: `assign-${Date.now()}`,
+      console.log("[v0] Assigning maintenance task...")
+
+      const assignmentData = {
         nest_box_id: nestBoxId,
         volunteer_id: volunteerId,
         status: "assigned",
+        assignment_type: "maintenance",
         assigned_date: new Date().toISOString().split("T")[0],
-        notes: "Maintenance task assigned",
-        created_at: new Date().toISOString(),
+        description: "Maintenance task assigned",
+        priority: "medium",
       }
 
-      setAssignments([...assignments, newAssignment])
-      alert("Maintenance task assigned successfully! (This is a demo)")
+      const { data, error } = await supabase.from("volunteer_assignments").insert([assignmentData]).select().single()
+
+      if (error) {
+        console.error("[v0] Error assigning maintenance task:", error)
+        alert("Error assigning task. Please try again.")
+        return
+      }
+
+      console.log("[v0] Successfully assigned maintenance task:", data)
+      setAssignments([data, ...assignments])
+      alert("Maintenance task assigned successfully!")
     } catch (error) {
-      console.error("Error assigning maintenance task:", error)
+      console.error("[v0] Error assigning maintenance task:", error)
       alert("Error assigning task. Please try again.")
     }
   }
 
   const completeMaintenanceTask = async (assignmentId: string) => {
     try {
-      setAssignments(
-        assignments.map((assignment) =>
-          assignment.id === assignmentId ? { ...assignment, status: "completed" } : assignment,
-        ),
-      )
-      alert("Maintenance task marked as complete! (This is a demo)")
+      console.log("[v0] Completing maintenance task...")
+
+      const { data, error } = await supabase
+        .from("volunteer_assignments")
+        .update({
+          status: "completed",
+          completion_date: new Date().toISOString().split("T")[0],
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", assignmentId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("[v0] Error completing maintenance task:", error)
+        alert("Error updating task. Please try again.")
+        return
+      }
+
+      console.log("[v0] Successfully completed maintenance task:", data)
+      setAssignments(assignments.map((assignment) => (assignment.id === assignmentId ? data : assignment)))
+      alert("Maintenance task marked as complete!")
     } catch (error) {
-      console.error("Error completing maintenance task:", error)
+      console.error("[v0] Error completing maintenance task:", error)
       alert("Error updating task. Please try again.")
     }
   }
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      // Update role in mock database
-      setVolunteers(
-        volunteers.map((volunteer) =>
-          volunteer.id === userId ? { ...volunteer, role: newRole, updated_at: new Date().toISOString() } : volunteer,
-        ),
-      )
+      console.log("[v0] Updating user role...")
 
-      alert(`User role updated to ${newRole} successfully! (This is a demo)`)
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          role: newRole,
+          is_admin: newRole === "admin",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("[v0] Error updating user role:", error)
+        alert("Error updating user role. Please try again.")
+        return
+      }
+
+      console.log("[v0] Successfully updated user role:", data)
+      setVolunteers(volunteers.map((volunteer) => (volunteer.id === userId ? data : volunteer)))
+      alert(`User role updated to ${newRole} successfully!`)
     } catch (error) {
-      console.error("Error updating user role:", error)
+      console.error("[v0] Error updating user role:", error)
       alert("Error updating user role. Please try again.")
     }
   }
@@ -607,6 +659,7 @@ export default function AdminDashboard() {
                         size="sm"
                         className="bg-white/80 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                       >
+                        <Edit className="w-4 h-4 mr-2" />
                         View Profile
                       </Button>
                     </div>

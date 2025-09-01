@@ -25,6 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const getInitialSession = async () => {
       try {
+        if (!supabase) {
+          console.error("Supabase client not initialized - missing environment variables")
+          setLoading(false)
+          return
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession()
@@ -40,6 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     getInitialSession()
+
+    if (!supabase) {
+      return
+    }
 
     // Listen for auth changes
     const {
@@ -57,6 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const fetchUserProfile = async (userId: string) => {
+    if (!supabase) {
+      console.error("Cannot fetch user profile - Supabase client not initialized")
+      return
+    }
+
     try {
       const { data: profile, error } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
 
@@ -72,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
+    if (!supabase) {
+      return { error: "Authentication service not available - missing configuration" }
+    }
+
     try {
       setLoading(true)
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -96,6 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signup = async (email: string, password: string, userData: any) => {
+    if (!supabase) {
+      return { error: "Authentication service not available - missing configuration" }
+    }
+
     try {
       setLoading(true)
       const { data, error } = await supabase.auth.signUp({
@@ -140,6 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    if (!supabase) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       const { error } = await supabase.auth.signOut()
@@ -156,6 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUser = async (updatedUser: Partial<UserProfile>) => {
     if (!user) return { error: "No user logged in" }
+
+    if (!supabase) {
+      return { error: "Database service not available - missing configuration" }
+    }
 
     try {
       const { error } = await supabase
