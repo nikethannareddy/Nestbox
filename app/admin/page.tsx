@@ -202,40 +202,33 @@ export default function AdminDashboard() {
   }
 
   const handleAddBox = async () => {
-    if (!user) return
-
-    console.log("[v0] Add nest box button clicked")
-    console.log("[v0] Form data:", {
-      name: newBox.name,
-      location: newBox.location,
-      coordinates: newBox.coordinates,
-      description: newBox.description,
-    })
+    if (!user) {
+      console.error("[v0] No authenticated user found")
+      throw new Error("User not authenticated")
+    }
 
     const isValid = newBox.name && newBox.coordinates.lat && newBox.coordinates.lng
-    console.log("[v0] Form validation:", {
-      hasName: !!newBox.name,
-      hasLat: !!newBox.coordinates.lat,
-      hasLng: !!newBox.coordinates.lng,
-      isValid,
-    })
-
     if (!isValid) {
-      console.log("[v0] Form validation failed - button should be disabled")
-      return
+      const error = new Error("Missing required fields")
+      console.error("[v0] Form validation failed:", {
+        hasName: !!newBox.name,
+        hasLat: !!newBox.coordinates.lat,
+        hasLng: !!newBox.coordinates.lng,
+      })
+      throw error
     }
 
     setIsSubmitting(true)
-    try {
-      console.log("[v0] Adding nest box to database...")
+    console.log("[v0] Starting form submission...")
 
+    try {
       const nestBoxData = {
         name: newBox.name,
         description: newBox.description,
         latitude: Number.parseFloat(newBox.coordinates.lat),
         longitude: Number.parseFloat(newBox.coordinates.lng),
         status: "active",
-        qr_code_url: `${window.location.origin}/box/`, // Will be updated after insertion
+        qr_code_url: `${window.location.origin}/box/`,
         installation_date: new Date().toISOString().split("T")[0],
         box_type: "standard",
         habitat_type: "mixed",
@@ -245,15 +238,20 @@ export default function AdminDashboard() {
         facing_direction: "east",
       }
 
-      const { data, error } = await supabase.from("nest_boxes").insert([nestBoxData]).select().single()
+      console.log("[v0] Attempting to insert into database:", nestBoxData)
+
+      const { data, error } = await supabase
+        .from("nest_boxes")
+        .insert([nestBoxData])
+        .select()
+        .single()
 
       if (error) {
-        console.error("[v0] Error inserting nest box:", error)
-        alert("Error adding nest box. Please try again.")
-        return
+        console.error("[v0] Database error:", error)
+        throw error
       }
 
-      console.log("[v0] Successfully added nest box:", data)
+      console.log("[v0] Successfully inserted nest box:", data)
 
       // Update QR code URL with the actual ID
       const updatedQRCode = `${window.location.origin}/box/${data.id}`
@@ -264,6 +262,7 @@ export default function AdminDashboard() {
 
       if (updateError) {
         console.error("[v0] Error updating QR code:", updateError)
+        throw updateError
       }
 
       // Add to local state
@@ -282,10 +281,11 @@ export default function AdminDashboard() {
 
       // Go to QR success page
       setActiveTab("qr-success")
-      alert("Nest box added successfully!")
+      console.log("[v0] Nest box added and form reset successfully")
+
     } catch (error) {
-      console.error("[v0] Error adding nest box:", error)
-      alert("Error adding nest box. Please try again.")
+      console.error("[v0] Error in handleAddBox:", error)
+      throw error // Re-throw to be caught by the button's error handling
     } finally {
       setIsSubmitting(false)
     }
@@ -858,16 +858,24 @@ export default function AdminDashboard() {
               </div>
 
               <Button
-                onClick={() => {
-                  console.log("[v0] Button clicked - immediate handler")
-                  console.log("[v0] Current form state:", {
+                onClick={async () => {
+                  if (isSubmitting) return
+
+                  console.log("[v0] Button clicked - form submission starting", {
                     name: newBox.name,
                     lat: newBox.coordinates.lat,
                     lng: newBox.coordinates.lng,
                     isSubmitting,
-                    buttonDisabled: !newBox.name || !newBox.coordinates.lat || !newBox.coordinates.lng || isSubmitting,
+                    hasRequiredFields: newBox.name && newBox.coordinates.lat && newBox.coordinates.lng,
+                    user: user ? 'authenticated' : 'not authenticated'
                   })
-                  handleAddBox()
+
+                  try {
+                    await handleAddBox()
+                  } catch (error) {
+                    console.error("[v0] Form submission failed:", error)
+                    alert('Failed to add nest box. Please check console for details.')
+                  }
                 }}
                 className="w-full bg-primary hover:bg-primary/90"
                 disabled={!newBox.name || !newBox.coordinates.lat || !newBox.coordinates.lng || isSubmitting}
