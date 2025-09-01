@@ -68,8 +68,7 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
       return
     }
 
-    onAuthSuccess({ role: "volunteer" })
-
+    // The auth provider will handle user state and the auth page will handle redirects
     setIsLoading(false)
   }
 
