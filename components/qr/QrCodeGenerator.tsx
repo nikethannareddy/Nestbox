@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import html2canvas from 'html2canvas';
+import { QrCodeGenerator } from './QrCodeGenerator';
 
 interface QrCodeGeneratorProps {
   nestBoxId: string;

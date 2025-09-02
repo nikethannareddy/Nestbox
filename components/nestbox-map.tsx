@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,73 +33,233 @@ const maintenanceStatusColors = {
   critical: "bg-red-700",
 }
 
-export function NestBoxMap() {
+interface NestBoxMapProps {
+  initialCenter?: [number, number];
+  initialZoom?: number;
+  highlightNestBoxId?: string;
+}
+
+export function NestBoxMap({ 
+  initialCenter,
+  initialZoom = 13,
+  highlightNestBoxId
+}: NestBoxMapProps) {
   const [nestBoxes, setNestBoxes] = useState<NestBox[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [speciesFilter, setSpeciesFilter] = useState("all")
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(
+    initialCenter || null
+  )
+  const [zoom, setZoom] = useState(initialZoom)
+  const [highlightedBox, setHighlightedBox] = useState<string | null>(highlightNestBoxId || null)
+  const mapRef = useRef<HTMLDivElement>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchNestBoxes()
-  }, [])
+    
+    // Initialize map here (pseudo-code, replace with your actual map implementation)
+    // const map = initializeMap(mapRef.current, {
+    //   center: initialCenter || [defaultLat, defaultLng],
+    //   zoom: initialZoom
+    // })
+    
+    // if (highlightNestBoxId) {
+    //   highlightNestBox(highlightNestBoxId)
+    // }
+  }, [highlightNestBoxId])
+
+  useEffect(() => {
+    if (highlightNestBoxId) {
+      setHighlightedBox(highlightNestBoxId)
+      // Center map on the highlighted nest box
+      const box = nestBoxes.find(box => box.id === highlightNestBoxId)
+      if (box) {
+        setCurrentLocation([box.latitude, box.longitude])
+        setZoom(18)
+      }
+    }
+  }, [highlightNestBoxId, nestBoxes])
 
   const fetchNestBoxes = async () => {
     try {
       setLoading(true)
-      setError(null)
-
-      console.log("[v0] Fetching nest boxes from database...")
-
-      const { data, error } = await supabase.from("nest_boxes").select("*").order("created_at", { ascending: false })
-
-      console.log("[v0] Database response:", { data, error })
-
-      if (error) {
-        console.error("[v0] Database error:", error)
-        throw error
+      const { data, error } = await supabase
+        .from('nest_boxes')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      
+      setNestBoxes(data || [])
+      
+      // If we have an initial center from QR code, use that
+      if (initialCenter) {
+        setCurrentLocation(initialCenter)
+      } else if (data?.length > 0) {
+        // Otherwise center on the first nest box
+        const firstBox = data[0]
+        setCurrentLocation([firstBox.latitude, firstBox.longitude])
       }
-
-      if (!data || data.length === 0) {
-        console.log("[v0] No nest boxes found in database")
-        setNestBoxes([])
-        return
-      }
-
-      console.log("[v0] Successfully loaded", data.length, "nest boxes from database")
-      setNestBoxes(data)
+      
     } catch (err) {
-      console.error("[v0] Error fetching nest boxes:", err)
-      setError(`Failed to load nest boxes: ${err instanceof Error ? err.message : "Unknown error"}`)
-      setNestBoxes([])
+      console.error('Error fetching nest boxes:', err)
+      setError('Failed to load nest boxes. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredBoxes = useMemo(() => {
-    return nestBoxes.filter((box) => {
-      const matchesSearch =
-        box.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        box.qr_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (box.target_species && box.target_species.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
+  // Rest of the component remains the same...
+  // [Previous implementation continues...]
+  
+  // Add this new method to handle highlighting a specific nest box
+  const highlightNestBox = (boxId: string) => {
+    const box = nestBoxes.find(b => b.id === boxId)
+    if (box) {
+      setHighlightedBox(boxId)
+      setCurrentLocation([box.latitude, box.longitude])
+      setZoom(18)
+      
+      // Scroll to the nest box in the list if it exists
+      const element = document.getElementById(`nest-box-${boxId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Add a temporary highlight class
+        element.classList.add('ring-2', 'ring-emerald-500')
+        setTimeout(() => {
+          element.classList.remove('ring-2', 'ring-emerald-500')
+        }, 3000)
+      }
+    }
+  }
 
-      const matchesStatus = statusFilter === "all" || box.status === statusFilter
-      const matchesSpecies = speciesFilter === "all" || box.target_species.includes(speciesFilter)
+  // Update the JSX to include the highlighted state for nest boxes
+  const renderNestBoxes = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+          <span className="ml-2 text-emerald-800">Loading nest boxes...</span>
+        </div>
+      )
+    }
+
+    if (error) {
+      return (
+        <div className="text-center py-8 text-red-600">
+          {error}
+          <Button 
+            onClick={fetchNestBoxes}
+            variant="outline"
+            className="mt-4"
+          >
+            Try Again
+          </Button>
+        </div>
+      )
+    }
+
+    const filteredBoxes = nestBoxes.filter(box => {
+      const matchesSearch = box.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          box.qr_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (box.target_species && box.target_species.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
+
+      const matchesStatus = statusFilter === 'all' || box.status === statusFilter
+      const matchesSpecies = speciesFilter === 'all' || box.target_species.includes(speciesFilter)
 
       return matchesSearch && matchesStatus && matchesSpecies
     })
-  }, [nestBoxes, searchTerm, statusFilter, speciesFilter])
 
-  const uniqueSpecies = useMemo(() => {
-    const species = nestBoxes
-      .flatMap((box) => box.target_species)
-      .filter((species): species is string => species !== null)
-    return [...new Set(species)]
-  }, [nestBoxes])
+    if (filteredBoxes.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          No nest boxes found. Try adjusting your filters.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {filteredBoxes.map(box => (
+          <div 
+            key={box.id}
+            id={`nest-box-${box.id}`}
+            className={`p-4 border rounded-lg transition-all duration-200 ${
+              highlightedBox === box.id 
+                ? 'border-emerald-500 bg-emerald-50' 
+                : 'border-gray-200 hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="font-medium text-lg">{box.name}</h4>
+                <p className="text-xs text-gray-600">ID: {box.qr_code}</p>
+                <div className="flex items-center mt-2">
+                  <span className={`inline-block w-3 h-3 rounded-full mr-2 ${
+                    statusColors[box.status as keyof typeof statusColors] || 'bg-gray-300'
+                  }`}></span>
+                  <span className="text-sm text-gray-700">
+                    {statusLabels[box.status as keyof typeof statusLabels] || box.status}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${statusColors[box.status]}`}></div>
+                <div
+                  className={`w-3 h-3 rounded-full ${maintenanceStatusColors[box.maintenance_status || "good"]}`}
+                ></div>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs mb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Location:</span>
+                <span className="text-right text-xs">{`${box.latitude}, ${box.longitude}`}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Species:</span>
+                <span>{box.target_species.join(", ") || "Various"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="secondary" className="text-xs">
+                  {statusLabels[box.status]}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Sponsor:</span>
+                <span className="text-right text-xs">{getSponsorName(box)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Link href={`/box/${box.qr_code}`} className="flex-1">
+                <Button size="sm" className="w-full text-xs bg-amber-600 hover:bg-amber-700">
+                  View Details
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-white/80"
+                onClick={(e) => {
+                  e.preventDefault()
+                  openGoogleMaps(box)
+                }}
+              >
+                <Navigation className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const openGoogleMaps = (box: NestBox) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${box.latitude},${box.longitude}`
@@ -255,67 +415,17 @@ export function NestBoxMap() {
         <div className="space-y-4">
           <h3 className="font-serif text-lg font-semibold">Nest Boxes ({filteredBoxes.length})</h3>
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {filteredBoxes.map((box) => (
-              <Card key={box.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="font-semibold text-sm">{box.name}</h4>
-                      <p className="text-xs text-muted-foreground">ID: {box.qr_code}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${statusColors[box.status]}`}></div>
-                      <div
-                        className={`w-3 h-3 rounded-full ${maintenanceStatusColors[box.maintenance_status || "good"]}`}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-xs mb-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Location:</span>
-                      <span className="text-right text-xs">{`${box.latitude}, ${box.longitude}`}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Species:</span>
-                      <span>{box.target_species.join(", ") || "Various"}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {statusLabels[box.status]}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Sponsor:</span>
-                      <span className="text-right text-xs">{getSponsorName(box)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Link href={`/box/${box.qr_code}`} className="flex-1">
-                      <Button size="sm" className="w-full text-xs bg-amber-600 hover:bg-amber-700">
-                        View Details
-                      </Button>
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="bg-white/80"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        openGoogleMaps(box)
-                      }}
-                    >
-                      <Navigation className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {renderNestBoxes()}
           </div>
         </div>
       </div>
     </div>
   )
 }
+
+const uniqueSpecies = useMemo(() => {
+  const species = nestBoxes
+    .flatMap((box) => box.target_species)
+    .filter((species): species is string => species !== null)
+  return [...new Set(species)]
+}, [nestBoxes])
