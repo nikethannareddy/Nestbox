@@ -29,9 +29,6 @@ export default function HomePage() {
                 <a href="/map">Explore</a>
               </Button>
               <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
-                <a href="/nest-check">Monitor</a>
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
                 <a href="/learn">Build</a>
               </Button>
               <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
