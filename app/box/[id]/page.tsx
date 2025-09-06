@@ -134,11 +134,7 @@ export default function NestBoxPage({ params }: { params: { id: string } }) {
 
   const fetchActivityLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from("activity_logs")
-        .select("*")
-        .order("observation_date", { ascending: false })
-        .limit(50)
+      const { data, error } = await supabase.from("activity_logs").select("*")
 
       if (error) {
         console.error("[v0] Error fetching activity logs:", error)
@@ -147,8 +143,12 @@ export default function NestBoxPage({ params }: { params: { id: string } }) {
 
       console.log("[v0] Fetched activity logs from database:", data)
 
-      // Filter by nest_box_id and limit to 10 in JavaScript since custom client doesn't support chaining after .eq()
-      const filteredData = data?.filter((log) => log.nest_box_id === params.id).slice(0, 10) || []
+      // Filter by nest_box_id, sort by date, and limit to 10 in JavaScript
+      const filteredData =
+        data
+          ?.filter((log) => log.nest_box_id === params.id)
+          .sort((a, b) => new Date(b.observation_date).getTime() - new Date(a.observation_date).getTime())
+          .slice(0, 10) || []
 
       const transformedLogs = filteredData.map((log) => ({
         id: log.id,

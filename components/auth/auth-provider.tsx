@@ -7,6 +7,7 @@ import type { UserProfile } from "@/lib/types/database"
 interface AuthContextType {
   user: UserProfile | null
   login: (email: string, password: string) => Promise<{ error?: string }>
+  loginWithGoogle: () => Promise<{ error?: string }>
   signup: (email: string, password: string, userData: any) => Promise<{ error?: string }>
   logout: () => Promise<void>
   updateUser: (updatedUser: Partial<UserProfile>) => Promise<{ error?: string }>
@@ -25,18 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const getInitialSession = async () => {
       try {
-        if (!supabase) {
-          console.error("Supabase client not initialized - missing environment variables")
-          setLoading(false)
-          return
-        }
-
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log("[v0] Getting initial session...")
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
         if (session?.user) {
+          console.log("[v0] Found existing session for user:", session.user.id)
           await fetchUserProfile(session.user.id)
         }
       } catch (error) {
-        console.error("Error getting session:", error)
+        console.error("[v0] Error getting session:", error)
       } finally {
         setLoading(false)
       }
@@ -44,19 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     getInitialSession()
 
-    if (!supabase) return
-
     // Set up the auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "SIGNED_IN" && session?.user) {
-          await fetchUserProfile(session.user.id)
-        } else if (event === "SIGNED_OUT") {
-          setUser(null)
-        }
-        setLoading(false)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[v0] Auth state change:", event, session?.user?.id)
+      if (event === "SIGNED_IN" && session?.user) {
+        await fetchUserProfile(session.user.id)
+      } else if (event === "SIGNED_OUT") {
+        setUser(null)
       }
-    )
+      setLoading(false)
+    })
 
     // Cleanup subscription on unmount
     return () => {
@@ -64,14 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         subscription.unsubscribe()
       }
     }
-  }, [supabase]) // Add supabase to dependency array
+  }, [supabase])
 
   const fetchUserProfile = async (userId: string) => {
-    if (!supabase) {
-      console.error("Cannot fetch user profile - Supabase client not initialized")
-      return
-    }
-
     try {
       console.log("[v0] Fetching user profile for:", userId)
       const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
@@ -80,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("[v0] Error fetching user profile:", error)
 
         if (error.code === "PGRST116") {
-          // No rows returned
+          // No rows returned - profile doesn't exist yet
           console.log("[v0] Profile not found, attempting to create from auth data...")
           await createProfileFromAuthUser(userId)
           return
@@ -96,8 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const createProfileFromAuthUser = async (userId: string) => {
-    if (!supabase) return
-
     try {
       // Get user data from auth
       const {
@@ -117,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from("profiles")
         .insert({
           id: userId,
-          full_name: user.user_metadata?.full_name || "",
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || "",
           email: user.email || "",
           phone: user.user_metadata?.phone || null,
           role: user.user_metadata?.role || "volunteer",
@@ -140,45 +131,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
-    if (!supabase) {
-      return { error: "Authentication service not available - missing configuration" }
-    }
-
     try {
       setLoading(true)
+      console.log("[v0] Attempting login for:", email)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error("[v0] Login error:", error)
         return { error: error.message }
       }
 
+      console.log("[v0] Login successful for user:", data.user?.id)
       if (data.user) {
         await fetchUserProfile(data.user.id)
       }
 
       return {}
     } catch (error) {
+      console.error("[v0] Login exception:", error)
       return { error: "Login failed" }
     } finally {
       setLoading(false)
     }
   }
 
-  const signup = async (email: string, password: string, userData: any) => {
-    if (!supabase) {
-      return { error: "Authentication service not available - missing configuration" }
-    }
-
+  const loginWithGoogle = async () => {
     try {
       setLoading(true)
+      console.log("[v0] Attempting Google OAuth login...")
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+        },
+      })
+
+      if (error) {
+        console.error("[v0] Google OAuth error:", error)
+        return { error: error.message }
+      }
+
+      console.log("[v0] Google OAuth initiated successfully")
+      return {}
+    } catch (error) {
+      console.error("[v0] Google OAuth exception:", error)
+      return { error: "Google sign-in failed" }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const signup = async (email: string, password: string, userData: any) => {
+    try {
+      setLoading(true)
+      console.log("[v0] Attempting signup for:", email)
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
           data: {
             full_name: `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
             first_name: userData.firstName || "",
@@ -190,13 +207,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       if (error) {
+        console.error("[v0] Signup error:", error)
         return { error: error.message }
       }
 
-      // Profile creation will happen via database trigger after email confirmation
-
+      console.log("[v0] Signup successful, confirmation email sent")
       return {}
     } catch (error) {
+      console.error("[v0] Signup exception:", error)
       return { error: "Signup failed" }
     } finally {
       setLoading(false)
@@ -204,21 +222,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    if (!supabase) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-
     try {
       setLoading(true)
+      console.log("[v0] Attempting logout...")
+
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error("Error signing out:", error)
+        console.error("[v0] Logout error:", error)
+      } else {
+        console.log("[v0] Logout successful")
       }
       setUser(null)
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("[v0] Logout exception:", error)
     } finally {
       setLoading(false)
     }
@@ -227,11 +243,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = async (updatedUser: Partial<UserProfile>) => {
     if (!user) return { error: "No user logged in" }
 
-    if (!supabase) {
-      return { error: "Database service not available - missing configuration" }
-    }
-
     try {
+      console.log("[v0] Updating user profile:", updatedUser)
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -241,13 +255,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("id", user.id)
 
       if (error) {
+        console.error("[v0] Update user error:", error)
         return { error: error.message }
       }
 
       // Update local state
       setUser({ ...user, ...updatedUser })
+      console.log("[v0] User profile updated successfully")
       return {}
     } catch (error) {
+      console.error("[v0] Update user exception:", error)
       return { error: "Failed to update profile" }
     }
   }
@@ -263,6 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         login,
+        loginWithGoogle,
         signup,
         logout,
         updateUser,
