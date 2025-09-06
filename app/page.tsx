@@ -310,19 +310,19 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Calendar className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-foreground">March 15, 2025</span>
+                  <span className="font-semibold text-foreground">September 20, 2025</span>
                 </div>
-                <h3 className="font-serif text-lg font-semibold mb-2 text-foreground">Spring Nest Box Maintenance</h3>
+                <h3 className="font-serif text-lg font-semibold mb-2 text-foreground">BUILD A BLUEBIRD BOX</h3>
                 <p className="text-muted-foreground mb-4">
-                  Join volunteers for our annual spring cleaning and maintenance of nest boxes throughout Sharon.
+                  {"Join Borderland Staff and Keep Sharon Beautiful and help us assemble bluebird boxes! Materials provided. For adults and older children. Rain or shine. Parking fees apply. Meet at Visitor Center."}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>9:00 AM - 12:00 PM</span>
+                  <span>{"9:00 AM - 11:00 AM"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                   <MapIcon className="h-4 w-4" />
-                  <span>Sharon Community Center</span>
+                  <span>{"Borderland State Park"}</span>
                 </div>
               </CardContent>
             </Card>
@@ -331,40 +331,19 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Calendar className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-foreground">April 22, 2025</span>
+                  <span className="font-semibold text-foreground">September 27, 2025</span>
                 </div>
-                <h3 className="font-serif text-lg font-semibold mb-2 text-foreground">Earth Day Bird Walk</h3>
+                <h3 className="font-serif text-lg font-semibold mb-2 text-foreground">Family Bird Walk</h3>
                 <p className="text-muted-foreground mb-4">
-                  Celebrate Earth Day with a guided bird watching tour and learn about local species conservation.
+                  {"Join us at Tidmarsh Wildlife Sanctuary in Plymouth for a family-friendly bird walk! All skill levels are welcome, this will be a relaxed opportunity for wandering the sanctuary and seeing what feathered friends we can find!"}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>7:00 AM - 10:00 AM</span>
+                  <span>10:00 - 11.30 AM</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                   <MapIcon className="h-4 w-4" />
-                  <span>Borderland State Park</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/20 bg-card/70 hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-foreground">May 10, 2025</span>
-                </div>
-                <h3 className="font-serif text-lg font-semibold mb-2 text-foreground">Volunteer Training Workshop</h3>
-                <p className="text-muted-foreground mb-4">
-                  New volunteer orientation covering bird identification, nest monitoring, and data collection.
-                </p>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>2:00 PM - 4:00 PM</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                  <MapIcon className="h-4 w-4" />
-                  <span>Sharon Public Library</span>
+                  <span>Tidmarsh Wildlife Sanctuary, Plymouth</span>
                 </div>
               </CardContent>
             </Card>

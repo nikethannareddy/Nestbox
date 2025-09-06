@@ -169,8 +169,9 @@ class CustomSupabaseClient implements SupabaseClient {
           }
         },
         insert: (data: any) => ({
-          select: () => ({
+          select: (columns = "*") => ({
             single: () => this.executeInsert(table, data),
+            then: (callback: any) => this.executeInsert(table, data).then(callback),
           }),
           then: (callback: any) => this.executeInsert(table, data).then(callback),
         }),

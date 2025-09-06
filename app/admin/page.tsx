@@ -26,8 +26,11 @@ import {
   CheckCircle,
   AlertTriangle,
   Loader2,
+  Flag,
 } from "lucide-react"
 import { AlertCircle } from "lucide-react" // Import AlertCircle
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Updated interfaces to match the database schema
 interface NestBox {
@@ -131,7 +134,7 @@ interface VolunteerAssignment {
 export default function AdminDashboard() {
   const { user, logout, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<
-    "overview" | "add" | "manage" | "volunteers" | "maintenance" | "qr-success"
+    "overview" | "add" | "manage" | "volunteers" | "maintenance" | "issues" | "qr-success"
   >("overview")
   const [loading, setLoading] = useState(true)
   const [nestBoxes, setNestBoxes] = useState<NestBox[]>([])
@@ -144,10 +147,19 @@ export default function AdminDashboard() {
     coordinates: { lat: "", lng: "" },
     description: "",
     photo: null as File | null,
+    box_type: "standard",
+    entrance_hole_size: "1.5",
+    height_from_ground: "5",
+    facing_direction: "east",
+    habitat_type: "mixed",
+    target_species: [] as string[],
+    installer_name: "",
+    sponsor_message: "",
   })
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newlyCreatedBox, setNewlyCreatedBox] = useState<NestBox | null>(null)
+  const [reportedIssues, setReportedIssues] = useState<any[]>([])
 
   const supabase = createClient()
 
@@ -228,8 +240,7 @@ export default function AdminDashboard() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setNewBox({
-            ...newBox,
+          updateNewBox({
             coordinates: {
               lat: position.coords.latitude.toFixed(6),
               lng: position.coords.longitude.toFixed(6),
@@ -250,69 +261,50 @@ export default function AdminDashboard() {
   }
 
   const handleAddBox = async () => {
-    if (!user) {
-      console.error("[v0] No authenticated user found")
-      throw new Error("User not authenticated")
-    }
-
-    const isValid = newBox.name && newBox.coordinates.lat && newBox.coordinates.lng
-    if (!isValid) {
-      const error = new Error("Missing required fields")
-      console.error("[v0] Form validation failed:", {
-        hasName: !!newBox.name,
-        hasLat: !!newBox.coordinates.lat,
-        hasLng: !!newBox.coordinates.lng,
-      })
-      throw error
+    if (!newBox.name.trim() || !newBox.coordinates.lat.trim() || !newBox.coordinates.lng.trim()) {
+      console.log("[v0] Button should be disabled - missing required fields")
+      return
     }
 
     setIsSubmitting(true)
-    console.log("[v0] Starting form submission...")
 
     try {
+      console.log("[v0] Adding nest box with data:", newBox)
+
       const nestBoxData = {
         name: newBox.name,
-        description: newBox.description,
+        description: newBox.description || null,
         latitude: Number.parseFloat(newBox.coordinates.lat),
         longitude: Number.parseFloat(newBox.coordinates.lng),
-        status: "active",
-        qr_code_url: `${window.location.origin}/box/`,
+        box_type: newBox.box_type || "standard",
+        entrance_hole_size: newBox.entrance_hole_size ? Number.parseFloat(newBox.entrance_hole_size) : null,
+        height_from_ground: newBox.height_from_ground ? Number.parseInt(newBox.height_from_ground) : null,
+        facing_direction: newBox.facing_direction || null,
+        habitat_type: newBox.habitat_type || null,
+        target_species: newBox.target_species || [],
         installation_date: new Date().toISOString().split("T")[0],
-        box_type: "standard",
-        habitat_type: "mixed",
-        target_species: ["bluebird", "chickadee"],
-        entrance_hole_size: 1.5,
-        height_from_ground: 5,
-        facing_direction: "east",
+        installer_name: newBox.installer_name || null,
+        sponsor_message: newBox.sponsor_message || null,
+        status: "active",
       }
 
-      console.log("[v0] Attempting to insert into database:", nestBoxData)
+      console.log("[v0] Inserting nest box data:", nestBoxData)
 
-      const { data, error } = await supabase.from("nest_boxes").insert([nestBoxData]).select().single()
+      const data = await supabase.from("nest_boxes").insert(nestBoxData).select()
 
-      if (error) {
-        console.error("[v0] Database error:", error)
-        throw error
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        throw new Error(`No valid data returned from database insert: ${data}`)
       }
 
-      console.log("[v0] Successfully inserted nest box:", data)
+      const insertedBox = data[0]
+      console.log("[v0] Successfully inserted nest box:", insertedBox)
 
-      // Update QR code URL with the actual ID
-      const updatedQRCode = `${window.location.origin}/box/${data.id}`
-      const { error: updateError } = await supabase
-        .from("nest_boxes")
-        .update({ qr_code_url: updatedQRCode, qr_code: updatedQRCode })
-        .eq("id", data.id)
-
-      if (updateError) {
-        console.error("[v0] Error updating QR code:", updateError)
-        throw updateError
+      if (!insertedBox?.id) {
+        throw new Error(`No ID found in inserted data: ${JSON.stringify(insertedBox)}`)
       }
 
-      // Add to local state
-      const updatedBox = { ...data, qr_code_url: updatedQRCode, qr_code: updatedQRCode }
-      setNestBoxes([updatedBox, ...nestBoxes])
-      setNewlyCreatedBox(updatedBox)
+      setNewlyCreatedBox(insertedBox)
+      await fetchDatabaseData()
 
       // Reset form
       setNewBox({
@@ -321,21 +313,79 @@ export default function AdminDashboard() {
         coordinates: { lat: "", lng: "" },
         description: "",
         photo: null,
+        box_type: "standard",
+        entrance_hole_size: "1.5",
+        height_from_ground: "5",
+        facing_direction: "east",
+        habitat_type: "mixed",
+        target_species: [],
+        installer_name: "",
+        sponsor_message: "",
+      })
+    } catch (error) {
+      console.error("[v0] Error adding nest box:", error)
+      alert("Error adding nest box. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleGenerateQRCode = async (nestBoxId: string) => {
+    if (!nestBoxId) {
+      throw new Error("No nest box ID provided for QR code generation")
+    }
+
+    console.log("[v0] Starting QR code generation for nest box:", nestBoxId)
+    setIsSubmitting(true)
+
+    try {
+      const qrCodeUrl = `https://nestbox.vercel.app/box/${nestBoxId}`
+      console.log("[v0] Generated QR code URL:", qrCodeUrl)
+
+      const response = await fetch(`/api/nestboxes/${nestBoxId}/qrcode`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: qrCodeUrl }),
       })
 
-      // Go to QR success page
-      setActiveTab("qr-success")
-      console.log("[v0] Nest box added and form reset successfully")
+      if (!response.ok) {
+        throw new Error(`Failed to generate QR code: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] QR code image generated:", result.qrCode.substring(0, 50) + "...")
+
+      // Update database with QR code URL and image
+      await supabase
+        .from("nest_boxes")
+        .update({
+          qr_code_url: qrCodeUrl,
+          qr_code: result.qrCode, // Store base64 image data for display
+        })
+        .eq("id", nestBoxId)
+
+      console.log("[v0] Successfully updated QR code URL and image")
+
+      // Fetch updated nest box data
+      const updatedData = await supabase.from("nest_boxes").select("*").eq("id", nestBoxId)
+
+      if (updatedData && Array.isArray(updatedData) && updatedData.length > 0) {
+        const updatedBox = updatedData[0]
+        setNewlyCreatedBox(updatedBox)
+        await fetchDatabaseData()
+        console.log("[v0] QR code generation completed successfully")
+      }
     } catch (error) {
-      console.error("[v0] Error in handleAddBox:", error)
-      throw error // Re-throw to be caught by the button's error handling
+      console.error("[v0] Error in handleGenerateQRCode:", error)
+      throw error
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const generateQRCodeSVG = (text: string) => {
-    // Simple QR code representation (in real app, use proper QR library)
     return `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="white"/><text x="100" y="100" textAnchor="middle" fontSize="12" fill="black">${text}</text></svg>`
   }
 
@@ -459,13 +509,25 @@ export default function AdminDashboard() {
     }
   }
 
-  // Get maintenance boxes (boxes that have maintenance needed logs)
   const maintenanceBoxes = nestBoxes.filter((box) =>
     activityLogs.some((log) => log.nest_box_id === box.id && log.maintenance_needed),
   )
 
-  // Get assigned maintenance tasks
   const assignedTasks = assignments.filter((assignment) => assignment.status === "assigned")
+
+  const updateNewBox = (updates: Partial<typeof newBox>) => {
+    const updatedBox = { ...newBox, ...updates }
+    setNewBox(updatedBox)
+
+    const isEnabled = updatedBox.name.trim() && updatedBox.coordinates.lat.trim() && updatedBox.coordinates.lng.trim()
+
+    console.log("[v0] Form state updated:", {
+      name: updatedBox.name,
+      lat: updatedBox.coordinates.lat,
+      lng: updatedBox.coordinates.lng,
+      buttonEnabled: isEnabled,
+    })
+  }
 
   if (authLoading) {
     return (
@@ -624,6 +686,18 @@ export default function AdminDashboard() {
           >
             <Wrench className="w-4 h-4 mr-2" />
             Maintenance
+          </Button>
+          <Button
+            variant={activeTab === "issues" ? "default" : "outline"}
+            onClick={() => setActiveTab("issues")}
+            className={
+              activeTab === "issues"
+                ? "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-white/80 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+            }
+          >
+            <Flag className="w-4 h-4 mr-2" />
+            Reported Issues
           </Button>
         </div>
 
@@ -854,11 +928,11 @@ export default function AdminDashboard() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="name">Name/Location</Label>
+                  <Label htmlFor="name">Name/Location *</Label>
                   <Input
                     id="name"
                     value={newBox.name}
-                    onChange={(e) => setNewBox({ ...newBox, name: e.target.value })}
+                    onChange={(e) => updateNewBox({ name: e.target.value })}
                     placeholder="e.g., Meadow View Box"
                   />
                 </div>
@@ -867,14 +941,139 @@ export default function AdminDashboard() {
                   <Input
                     id="location"
                     value={newBox.location}
-                    onChange={(e) => setNewBox({ ...newBox, location: e.target.value })}
+                    onChange={(e) => updateNewBox({ location: e.target.value })}
                     placeholder="e.g., Sharon Community Garden"
                   />
                 </div>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="box-type">Box Type</Label>
+                  <Select value={newBox.box_type} onValueChange={(value) => updateNewBox({ box_type: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="bluebird">Bluebird Special</SelectItem>
+                      <SelectItem value="wren">Wren House</SelectItem>
+                      <SelectItem value="chickadee">Chickadee Box</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="entrance-hole">Entrance Hole Size (inches)</Label>
+                  <Input
+                    id="entrance-hole"
+                    type="number"
+                    step="0.1"
+                    value={newBox.entrance_hole_size}
+                    onChange={(e) => updateNewBox({ entrance_hole_size: e.target.value })}
+                    placeholder="1.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="height">Height from Ground (feet)</Label>
+                  <Input
+                    id="height"
+                    type="number"
+                    value={newBox.height_from_ground}
+                    onChange={(e) => updateNewBox({ height_from_ground: e.target.value })}
+                    placeholder="5"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="facing">Facing Direction</Label>
+                  <Select
+                    value={newBox.facing_direction}
+                    onValueChange={(value) => updateNewBox({ facing_direction: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="north">North</SelectItem>
+                      <SelectItem value="northeast">Northeast</SelectItem>
+                      <SelectItem value="east">East</SelectItem>
+                      <SelectItem value="southeast">Southeast</SelectItem>
+                      <SelectItem value="south">South</SelectItem>
+                      <SelectItem value="southwest">Southwest</SelectItem>
+                      <SelectItem value="west">West</SelectItem>
+                      <SelectItem value="northwest">Northwest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="habitat">Habitat Type</Label>
+                  <Select value={newBox.habitat_type} onValueChange={(value) => updateNewBox({ habitat_type: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                      <SelectItem value="forest">Forest</SelectItem>
+                      <SelectItem value="meadow">Meadow</SelectItem>
+                      <SelectItem value="wetland">Wetland</SelectItem>
+                      <SelectItem value="urban">Urban</SelectItem>
+                      <SelectItem value="suburban">Suburban</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div>
-                <Label>GPS Coordinates</Label>
+                <Label>Target Species</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                  {["bluebird", "chickadee", "wren", "swallow", "nuthatch", "titmouse", "sparrow", "other"].map(
+                    (species) => (
+                      <div key={species} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={species}
+                          checked={newBox.target_species.includes(species)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateNewBox({ target_species: [...newBox.target_species, species] })
+                            } else {
+                              updateNewBox({ target_species: newBox.target_species.filter((s) => s !== species) })
+                            }
+                          }}
+                        />
+                        <Label htmlFor={species} className="text-sm capitalize">
+                          {species}
+                        </Label>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="installer">Installer Name</Label>
+                  <Input
+                    id="installer"
+                    value={newBox.installer_name}
+                    onChange={(e) => updateNewBox({ installer_name: e.target.value })}
+                    placeholder="Who installed this box?"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sponsor">Sponsor Message</Label>
+                  <Input
+                    id="sponsor"
+                    value={newBox.sponsor_message}
+                    onChange={(e) => updateNewBox({ sponsor_message: e.target.value })}
+                    placeholder="Optional sponsor message"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>GPS Coordinates *</Label>
                 <div className="flex gap-2 mb-2">
                   <Button
                     type="button"
@@ -889,24 +1088,20 @@ export default function AdminDashboard() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="lat">Latitude</Label>
+                    <Label htmlFor="lat">Latitude *</Label>
                     <Input
                       id="lat"
                       value={newBox.coordinates.lat}
-                      onChange={(e) =>
-                        setNewBox({ ...newBox, coordinates: { ...newBox.coordinates, lat: e.target.value } })
-                      }
+                      onChange={(e) => updateNewBox({ coordinates: { ...newBox.coordinates, lat: e.target.value } })}
                       placeholder="42.1237"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="lng">Longitude</Label>
+                    <Label htmlFor="lng">Longitude *</Label>
                     <Input
                       id="lng"
                       value={newBox.coordinates.lng}
-                      onChange={(e) =>
-                        setNewBox({ ...newBox, coordinates: { ...newBox.coordinates, lng: e.target.value } })
-                      }
+                      onChange={(e) => updateNewBox({ coordinates: { ...newBox.coordinates, lng: e.target.value } })}
                       placeholder="-71.1786"
                     />
                   </div>
@@ -918,7 +1113,7 @@ export default function AdminDashboard() {
                 <Textarea
                   id="description"
                   value={newBox.description}
-                  onChange={(e) => setNewBox({ ...newBox, description: e.target.value })}
+                  onChange={(e) => updateNewBox({ description: e.target.value })}
                   placeholder="Describe the nest box location and any special features..."
                 />
               </div>
@@ -930,52 +1125,91 @@ export default function AdminDashboard() {
                     id="photo"
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setNewBox({ ...newBox, photo: e.target.files?.[0] || null })}
+                    onChange={(e) => updateNewBox({ photo: e.target.files?.[0] || null })}
                   />
                   <Camera className="w-5 h-5 text-primary" />
                 </div>
               </div>
 
-              <Button
-                onClick={async () => {
-                  if (isSubmitting) return
-
-                  console.log("[v0] Button clicked - form submission starting", {
-                    name: newBox.name,
-                    lat: newBox.coordinates.lat,
-                    lng: newBox.coordinates.lng,
-                    isSubmitting,
-                    hasRequiredFields: newBox.name && newBox.coordinates.lat && newBox.coordinates.lng,
-                    user: user ? "authenticated" : "not authenticated",
-                  })
-
-                  try {
-                    await handleAddBox()
-                  } catch (error) {
-                    console.error("[v0] Form submission failed:", error)
-                    alert("Failed to add nest box. Please check console for details.")
+              <div className="space-y-3">
+                <Button
+                  onClick={handleAddBox}
+                  disabled={
+                    !newBox.name.trim() ||
+                    !newBox.coordinates.lat.trim() ||
+                    !newBox.coordinates.lng.trim() ||
+                    isSubmitting
                   }
-                }}
-                className="w-full bg-primary hover:bg-primary/90"
-                disabled={!newBox.name || !newBox.coordinates.lat || !newBox.coordinates.lng || isSubmitting}
-              >
-                {isSubmitting ? (
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Adding Nest Box...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Nest Box
+                    </>
+                  )}
+                </Button>
+
+                {newlyCreatedBox && !newlyCreatedBox.qr_code && (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding Nest Box...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Nest Box & Generate QR Code
+                    {console.log("[v0] Showing Generate QR Code button for:", newlyCreatedBox)}
+                    <Button
+                      onClick={async () => {
+                        if (isSubmitting) return
+
+                        console.log("[v0] Generate QR Code button clicked for nest box:", newlyCreatedBox.id)
+
+                        try {
+                          await handleGenerateQRCode(newlyCreatedBox.id)
+                        } catch (error) {
+                          console.error("[v0] QR code generation failed:", error)
+                          alert("Failed to generate QR code. Please check console for details.")
+                        }
+                      }}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating QR Code...
+                        </>
+                      ) : (
+                        <>
+                          <QrCode className="w-4 h-4 mr-2" />
+                          Generate QR Code
+                        </>
+                      )}
+                    </Button>
                   </>
                 )}
-              </Button>
+              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* QR Success Tab */}
+        {activeTab === "issues" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-foreground">Reported Issues</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Issues will be loaded from database */}
+                <div className="text-center py-8 text-muted-foreground">
+                  <Flag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No reported issues at this time.</p>
+                  <p className="text-sm">Issues reported by users will appear here.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {activeTab === "qr-success" && newlyCreatedBox && (
           <Card>
             <CardHeader>
@@ -984,7 +1218,15 @@ export default function AdminDashboard() {
             <CardContent className="text-center space-y-6">
               <div className="bg-white p-6 rounded-lg border-2 border-primary inline-block">
                 <div className="w-48 h-48 bg-gray-100 border border-gray-300 flex items-center justify-center mb-4 mx-auto">
-                  <QrCode className="w-24 h-24 text-primary" />
+                  {newlyCreatedBox.qr_code ? (
+                    <img
+                      src={newlyCreatedBox.qr_code || "/placeholder.svg"}
+                      alt={`QR Code for ${newlyCreatedBox.name}`}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <QrCode className="w-24 h-24 text-primary" />
+                  )}
                 </div>
                 <h3 className="font-bold text-lg">{newlyCreatedBox.name}</h3>
                 <p className="text-muted-foreground">
@@ -1036,22 +1278,47 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      {!box.qr_code && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (isSubmitting) return
+
+                            console.log("[v0] Generate QR Code button clicked for existing nest box:", box.id)
+
+                            try {
+                              await handleGenerateQRCode(box.id)
+                            } catch (error) {
+                              console.error("[v0] QR code generation failed for existing box:", error)
+                              alert("Failed to generate QR code. Please check console for details.")
+                            }
+                          }}
+                          className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <QrCode className="w-4 h-4 mr-2" />
+                              Generate QR
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => printQRCode(box)}
                         className="bg-white/80 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                        disabled={!box.qr_code}
                       >
                         <Printer className="w-4 h-4 mr-2" />
                         Print QR
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-white/80 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
                       </Button>
                     </div>
                   </div>

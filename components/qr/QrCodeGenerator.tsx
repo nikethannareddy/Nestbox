@@ -1,4 +1,4 @@
-/*"use client";
+"use client";
 
 import { useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -264,83 +264,4 @@ export function QrCodeGenerator({
       </CardContent>
     </Card>
   );
-}*/
-
-"use client"
-
-import { useEffect, useRef } from 'react';
-import QRCode from 'qrcode';
-
-interface QrCodeGeneratorProps {
-  nestBoxId: string;
-  latitude: number;
-  longitude: number;
-  className?: string;
-}
-
-export function QrCodeGenerator({ nestBoxId, latitude, longitude, className = '' }: QrCodeGeneratorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Generate the URL that the QR code will point to
-  const generateLocationUrl = () => {
-    return `${window.location.origin}/map?nestBoxId=${nestBoxId}&lat=${latitude}&lng=${longitude}&zoom=18`;
-  };
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const url = generateLocationUrl();
-    
-    // Generate QR code
-    QRCode.toCanvas(
-      canvasRef.current,
-      url,
-      {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#065f46', // emerald-800
-          light: '#ffffff'
-        }
-      },
-      (error) => {
-        if (error) console.error('Error generating QR code:', error);
-      }
-    );
-  }, [nestBoxId, latitude, longitude]);
-
-  return (
-    <div className={`flex flex-col items-center ${className}`}>
-      <canvas ref={canvasRef} className="border border-gray-200 rounded-lg p-2 bg-white" />
-      <p className="mt-2 text-sm text-gray-500 text-center">
-        Scan to view this nest box on the map
-      </p>
-    </div>
-  );
-}
-
-export function QrCodePreview({ url, className = '' }: { url: string; className?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    QRCode.toCanvas(
-      canvasRef.current,
-      url,
-      {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#065f46', // emerald-800
-          light: '#ffffff'
-        }
-      },
-      (error) => {
-        if (error) console.error('Error generating QR code:', error);
-      }
-    );
-  }, [url]);
-
-  return <canvas ref={canvasRef} className={className} />;
 }
