@@ -6,28 +6,23 @@ import { AuthForms } from "@/components/auth/auth-forms"
 import { useAuth } from "@/components/auth/auth-provider"
 
 export default function AuthPage() {
-  const { login, isAuthenticated, user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const mode = searchParams.get("mode") // Check for signup mode
+  const mode = searchParams.get('mode')
+  const { user, isAuthenticated } = useAuth()
 
+  // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === "admin") {
-        router.push("/admin")
-      } else {
-        router.push("/dashboard")
-      }
+      const redirectPath = user.role === 'admin' ? '/admin' : '/dashboard'
+      router.push(redirectPath)
     }
   }, [isAuthenticated, user, router])
 
-  const handleAuthSuccess = (user: any) => {
-    login(user)
-    if (user.role === "admin") {
-      router.push("/admin")
-    } else {
-      router.push("/dashboard")
-    }
+  const handleAuthSuccess = (userData: any) => {
+    // This will be called after successful authentication
+    const redirectPath = userData?.role === 'admin' ? '/admin' : '/dashboard'
+    router.push(redirectPath)
   }
 
   return (
