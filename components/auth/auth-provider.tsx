@@ -98,35 +98,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (authError || !user) {
         console.error("[v0] Error getting auth user:", authError)
-        return
+        throw new Error("Failed to get user information")
       }
 
       console.log("[v0] Creating profile from auth user data:", user)
 
-      // Create profile manually
+      // Prepare profile data with all required fields
+      const profileData = {
+        id: userId,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || "New User",
+        email: user.email || "",
+        phone: user.user_metadata?.phone || "",
+        role: "volunteer", // Default role
+        bio: "",
+        location: "",
+        emergency_contact: "",
+        emergency_phone: "",
+        preferred_contact_method: "email",
+        notifications_enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      // Create profile
       const { data: newProfile, error: insertError } = await supabase
         .from("profiles")
-        .insert({
-          id: userId,
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name || "",
-          email: user.email || "",
-          phone: user.user_metadata?.phone || null,
-          role: user.user_metadata?.role || "volunteer",
-          is_admin: user.user_metadata?.role === "admin",
-          is_superuser: false,
-        })
+        .insert(profileData)
         .select()
         .single()
 
       if (insertError) {
         console.error("[v0] Error creating profile:", insertError)
-        return
+        throw new Error(insertError.message)
       }
 
       console.log("[v0] Successfully created profile:", newProfile)
       setUser(newProfile)
+      return newProfile
     } catch (error) {
       console.error("[v0] Error creating profile from auth user:", error)
+      throw error // Re-throw to be caught by the caller
     }
   }
 
@@ -135,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true)
       console.log("[v0] Attempting login for:", email)
 
+      // First, sign in with email/password
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -145,15 +157,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message }
       }
 
-      console.log("[v0] Login successful for user:", data.user?.id)
-      if (data.user) {
+      if (!data.user) {
+        console.error("[v0] No user returned after successful login")
+        return { error: "Authentication failed. Please try again." }
+      }
+
+      console.log("[v0] Login successful for user:", data.user.id)
+      
+      // Fetch user profile (this will create one if it doesn't exist)
+      try {
         await fetchUserProfile(data.user.id)
+      } catch (profileError) {
+        console.error("[v0] Error handling user profile after login:", profileError)
+        // Continue even if profile handling fails, as we have a minimal user object
       }
 
       return {}
     } catch (error) {
       console.error("[v0] Login exception:", error)
-      return { error: "Login failed" }
+      return { error: error instanceof Error ? error.message : "Login failed" }
     } finally {
       setLoading(false)
     }
