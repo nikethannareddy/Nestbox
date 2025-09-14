@@ -207,38 +207,52 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles table
--- First, drop existing policies to avoid conflicts
+-- First, drop all existing policies to avoid conflicts
 DROP POLICY IF EXISTS "profiles_admin_all" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_delete" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_insert" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_select" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_update" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_delete_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_select_admin" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_admin" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 
--- Recreate policies with proper conditions to prevent recursion
--- Allow users to see their own profile
+-- 1. Users can view their own profile
 CREATE POLICY "profiles_select_own" ON public.profiles 
 FOR SELECT 
 USING (auth.uid() = id);
 
--- Allow users to insert their own profile
-CREATE POLICY "profiles_insert_own" ON public.profiles 
-FOR INSERT 
-WITH CHECK (auth.uid() = id);
-
--- Allow users to update their own profile
+-- 2. Users can update their own profile
 CREATE POLICY "profiles_update_own" ON public.profiles 
 FOR UPDATE 
 USING (auth.uid() = id);
 
--- Allow users to delete their own profile
+-- 3. Users can insert their own profile (for initial creation)
+CREATE POLICY "profiles_insert_own" ON public.profiles 
+FOR INSERT 
+WITH CHECK (auth.uid() = id);
+
+-- 4. Users can delete their own profile
 CREATE POLICY "profiles_delete_own" ON public.profiles 
 FOR DELETE 
 USING (auth.uid() = id);
 
--- Allow admins to perform any operation on any profile
--- This uses a direct check against the JWT claims to avoid recursion
-CREATE POLICY "profiles_admin_all" ON public.profiles 
-FOR ALL 
+-- 5. Admins can view all profiles (using JWT claim to avoid recursion)
+CREATE POLICY "profiles_select_admin" ON public.profiles 
+FOR SELECT 
+USING (auth.jwt() ->> 'role' = 'admin');
+
+-- 6. Admins can update all profiles
+CREATE POLICY "profiles_update_admin" ON public.profiles 
+FOR UPDATE 
+USING (auth.jwt() ->> 'role' = 'admin');
+
+-- 7. Admins can delete profiles
+CREATE POLICY "profiles_delete_admin" ON public.profiles 
+FOR DELETE 
 USING (auth.jwt() ->> 'role' = 'admin');
 
 -- RLS Policies for sponsors table
