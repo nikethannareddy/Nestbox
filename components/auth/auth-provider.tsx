@@ -1,18 +1,22 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { Profile as UserProfile } from "@/lib/types/database"
+import type { Database } from "@/lib/types/database"
 import { useRouter } from 'next/navigation'
 
+type Profile = Database['public']['Tables']['profiles']['Row'] & {
+  is_admin: boolean;
+}
+
 interface AuthContextType {
-  user: UserProfile | null
+  user: Profile | null
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<{ error?: string }>
   loginWithGoogle: () => Promise<{ error?: string }>
   signup: (email: string, password: string, userData: any) => Promise<{ error?: string }>
   logout: () => Promise<void>
-  updateUser: (updatedUser: Partial<UserProfile>) => Promise<{ error?: string }>
+  updateUser: (updatedUser: Partial<Profile>) => Promise<{ error?: string }>
   hasRole: (role: string | string[]) => boolean
   loading: boolean
 }
@@ -20,7 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
+  const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
@@ -32,21 +36,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.includes(user.role)
   }
 
-  useEffect(() => {
-    // Check active sessions and set the user
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN') {
-          if (session?.user) {
-            await fetchUserProfile(session.user.id);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          router.push('/auth');
-        }
-        setLoading(false);
+  // Fetch user profile from database
+  const fetchUserProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    if (!userId) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        const userData = {
+          ...data,
+          is_admin: data.role === 'admin',
+        };
+        setUser(userData);
+        return userData;
       }
-    );
+      return null;
+    } catch (error) {
+      console.error('[Auth] Error fetching profile:', error);
+      await supabase.auth.signOut();
+      setUser(null);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
+
+    const handleAuthChange = async (event: any, session: any) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        await fetchUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+      setLoading(false);
+    };
+
+    // Set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+    authSubscription = subscription;
 
     // Initial session check
     const checkSession = async () => {
@@ -58,112 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       } catch (error) {
-        console.error('Session check error:', error);
+        console.error('[Auth] Session check error:', error);
         setLoading(false);
       }
     };
 
     checkSession();
-    return () => subscription?.unsubscribe();
-  }, []);
 
-  // Fetch user profile from database
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      console.log('[Auth] Fetching profile for user:', userId)
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        console.error('[Auth] Error fetching profile:', error)
-        
-        if (error.code === 'PGRST116') { // No rows returned
-          console.log('[Auth] Profile not found, creating new profile...')
-          await createProfileFromAuthUser(userId)
-          return
-        }
-        
-        throw error
+    return () => {
+      mounted = false;
+      if (authSubscription) {
+        authSubscription.unsubscribe();
       }
-
-      console.log('[Auth] Profile loaded:', profile)
-      setUser(profile)
-      
-      // Redirect based on role if needed
-      if (profile.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/dashboard')
-      }
-      
-      return profile
-    } catch (error) {
-      console.error('[Auth] Error in fetchUserProfile:', error)
-      throw error
-    }
-  }
-
-  // Create profile from auth user
-  const createProfileFromAuthUser = async (userId: string) => {
-    try {
-      // Get user data from auth
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !authUser) {
-        console.error("[Auth] Error getting auth user:", authError)
-        throw new Error("Failed to get user information")
-      }
-
-      console.log("[Auth] Creating profile from auth user data:", authUser)
-
-      // Prepare profile data with all required fields
-      const profileData: Omit<UserProfile, 'created_at' | 'updated_at'> & { 
-        created_at: string 
-        updated_at: string 
-      } = {
-        id: userId,
-        full_name: authUser.user_metadata?.full_name || 
-                   authUser.user_metadata?.name || 
-                   "New User",
-        email: authUser.email || "",
-        phone: authUser.user_metadata?.phone || "",
-        role: "volunteer",
-        bio: "",
-        location: "",
-        emergency_contact: "",
-        emergency_phone: "",
-        volunteer_since: new Date().toISOString().split('T')[0],
-        total_observations: 0,
-        total_maintenance_tasks: 0,
-        preferred_contact_method: "email",
-        notifications_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      // Create profile
-      const { data: newProfile, error: insertError } = await supabase
-        .from("profiles")
-        .insert(profileData)
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error("[Auth] Error creating profile:", insertError)
-        throw new Error(insertError.message)
-      }
-
-      console.log("[Auth] Successfully created profile:", newProfile)
-      setUser(newProfile)
-      return newProfile
-    } catch (error) {
-      console.error("[Auth] Error creating profile from auth user:", error)
-      throw error
-    }
-  }
+    };
+  }, [fetchUserProfile]);
 
   // Login with email and password
   const login = async (email: string, password: string) => {
@@ -184,16 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!data.user) {
-        console.error('[Auth] No user returned after login');
         return { error: 'Authentication failed. Please try again.' };
       }
 
-      console.log('[Auth] Login successful for user:', data.user.id);
+      // Fetch user profile and wait for it to complete
+      await fetchUserProfile(data.user.id);
       return {};
       
     } catch (error) {
       console.error('[Auth] Login exception:', error);
-      return { error: 'An unexpected error occurred during login' };
+      return { error: error instanceof Error ? error.message : 'An unexpected error occurred' };
     } finally {
       setLoading(false);
     }
@@ -276,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Update user profile
-  const updateUser = async (updatedUser: Partial<UserProfile>) => {
+  const updateUser = async (updatedUser: Partial<Profile>) => {
     if (!user) return { error: "No user logged in" }
 
     try {
