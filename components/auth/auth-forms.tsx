@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Mail, Lock, UserPlus, LogIn, Heart, Users, AlertCircle } from "lucide-react"
 import { useAuth } from "./auth-provider"
+import { useRouter } from "next/router"
 
 const userRoles = [
   {
@@ -35,6 +36,7 @@ interface AuthFormsProps {
 
 export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
   const { login, loginWithGoogle, signup } = useAuth()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState(initialMode === "signup" ? "signup" : "login")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,33 +58,32 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
   })
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Trim email and password to prevent whitespace issues
-      const { error: loginError } = await login(
-        loginData.email.trim(),
-        loginData.password
-      )
-
-      if (loginError) {
-        setError(loginError)
-        return
-      }
-      
-      // The auth provider will handle the redirection
-    } catch (err) {
-      console.error('Login error:', err)
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      // Don't set loading to false immediately, let the auth provider handle it
-      // This prevents UI flicker during redirect
-      if (!error) {
-        setIsLoading(false)
-      }
+    e.preventDefault();
+    if (!loginData.email || !loginData.password) {
+      setError('Please fill in all fields');
+      return;
     }
+
+    setError('');
+    setIsLoading(true)
+    const { error: loginError } = await login(loginData.email, loginData.password);
+    
+    if (loginError) {
+      setError(loginError);
+      setIsLoading(false)
+    } else {
+      // Redirect is handled by the auth provider
+      router.push('/dashboard');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="mt-4 text-foreground/80">Signing in...</p>
+      </div>
+    );
   }
 
   const handleGoogleLogin = async () => {
