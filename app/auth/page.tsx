@@ -51,7 +51,7 @@ export default function AuthPage() {
           <p className="text-muted-foreground">Protecting birds, one box at a time.</p>
         </div>
 
-        <AuthForms onSuccess={handleAuthSuccess} mode={mode || 'login'} />
+        <AuthForms onAuthSuccess={handleAuthSuccess} initialMode="login" />
 
         <div className="mt-6 text-center">
           <a href="/" className="text-primary hover:text-primary/80 text-sm">

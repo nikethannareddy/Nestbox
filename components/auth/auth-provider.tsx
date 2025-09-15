@@ -36,33 +36,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.includes(user.role)
   }
 
-  // Fetch user profile from database
+  // Fetch user profile from database with retry logic
   const fetchUserProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     if (!userId) return null;
     
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
+    
+    while (retryCount < MAX_RETRIES) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (error) throw error;
-      if (data) {
-        const userData = {
-          ...data,
-          is_admin: data.role === 'admin',
-        };
-        setUser(userData);
-        return userData;
+        if (error) throw error;
+        
+        if (data) {
+          const userData = {
+            ...data,
+            is_admin: data.role === 'admin',
+          };
+          setUser(userData);
+          return userData;
+        }
+      } catch (error: any) {
+        if (error.message?.includes('Too Many Requests') && retryCount < MAX_RETRIES - 1) {
+          // Wait for an increasing amount of time before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          retryCount++;
+          continue;
+        }
+        console.error('[Auth] Error fetching profile:', error);
+        await supabase.auth.signOut();
+        setUser(null);
+        return null;
       }
-      return null;
-    } catch (error) {
-      console.error('[Auth] Error fetching profile:', error);
-      await supabase.auth.signOut();
-      setUser(null);
-      return null;
     }
+    
+    return null;
   }, []);
 
   useEffect(() => {
@@ -131,13 +144,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: 'Authentication failed. Please try again.' };
       }
 
-      // Fetch user profile and wait for it to complete
-      await fetchUserProfile(data.user.id);
+      // Fetch user profile with retry logic
+      const profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        return { error: 'Failed to load user profile. Please try again.' };
+      }
+      
       return {};
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Auth] Login exception:', error);
-      return { error: error instanceof Error ? error.message : 'An unexpected error occurred' };
+      return { 
+        error: error.message?.includes('Too Many Requests') 
+          ? 'Too many login attempts. Please wait a moment and try again.' 
+          : 'An unexpected error occurred. Please try again.'
+      };
     } finally {
       setLoading(false);
     }
