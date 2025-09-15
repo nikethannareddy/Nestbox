@@ -361,7 +361,6 @@ export default function AdminDashboard() {
       await supabase
         .from("nest_boxes")
         .update({
-          qr_code_url: qrCodeUrl,
           qr_code: result.qrCode, // Store base64 image data for display
         })
         .eq("id", nestBoxId)
@@ -405,7 +404,7 @@ export default function AdminDashboard() {
           <body>
             <div class="qr-container">
               <h2>NestBox ${box.id.slice(0, 8)}</h2>
-              <div class="qr-code" style="background: url('${generateQRCodeSVG(box.qr_code_url)}') center/contain no-repeat;"></div>
+              <div class="qr-code" style="background: url('${generateQRCodeSVG(box.qr_code)}') center/contain no-repeat;"></div>
               <p><strong>${box.name}</strong></p>
               <p>Lat: ${box.latitude}, Lng: ${box.longitude}</p>
               <p>Scan to log activity</p>
@@ -587,9 +586,6 @@ export default function AdminDashboard() {
               </Link>
               <Link href="/learn" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 Build
-              </Link>
-              <Link href="/nest-check" className="text-emerald-700 hover:text-emerald-900 transition-colors">
-                Monitor
               </Link>
               <Link href="/about" className="text-emerald-700 hover:text-emerald-900 transition-colors">
                 About
