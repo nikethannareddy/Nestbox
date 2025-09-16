@@ -3,7 +3,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types/database"
-import { useRouter } from 'next/navigation'
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   is_admin: boolean;
@@ -26,8 +25,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [routerReady, setRouterReady] = useState(false)
   const supabase = createClient()
-  const router = useRouter()
+  
+  // Initialize router in a state that can be updated after mount
+  const [router, setRouter] = useState<any>(null)
+
+  // Load router only after component mounts
+  useEffect(() => {
+    // Import router dynamically to ensure it's only loaded on client-side
+    import('next/navigation').then(({ useRouter }) => {
+      setRouter(useRouter())
+      setRouterReady(true)
+    })
+  }, [])
 
   // Helper to check if user has required role(s)
   const hasRole = (role: string | string[]): boolean => {
@@ -123,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserProfile]);
 
   // Login with email and password
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       setLoading(true);
       
@@ -150,6 +161,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: 'Failed to load user profile. Please try again.' };
       }
       
+      // Only navigate if router is ready
+      if (routerReady && router) {
+        router.push('/dashboard')
+      }
+      
       return {};
       
     } catch (error: any) {
@@ -162,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router, routerReady]);
 
   // Login with Google
   const loginWithGoogle = async () => {
@@ -231,7 +247,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error
       
       setUser(null)
-      router.push('/auth')
+      if (routerReady && router) {
+        router.push('/auth')
+      }
     } catch (error) {
       console.error('[Auth] Logout error:', error)
       throw error
