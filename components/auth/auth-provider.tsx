@@ -1,8 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/types/database"
+import { useRouter } from 'next/navigation'
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   is_admin: boolean;
@@ -25,27 +26,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [routerReady, setRouterReady] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  const router = useRouter()
   const supabase = createClient()
-  
-  // Initialize router in a state that can be updated after mount
-  const [router, setRouter] = useState<any>(null)
-
-  // Load router only after component mounts
-  useEffect(() => {
-    // Import router dynamically to ensure it's only loaded on client-side
-    import('next/navigation').then(({ useRouter }) => {
-      setRouter(useRouter())
-      setRouterReady(true)
-    })
-  }, [])
 
   // Helper to check if user has required role(s)
-  const hasRole = (role: string | string[]): boolean => {
+  const hasRole = useCallback((role: string | string[]): boolean => {
     if (!user || !user.role) return false
     const roles = Array.isArray(role) ? role : [role]
     return roles.includes(user.role)
-  }
+  }, [user])
 
   // Fetch user profile from database with retry logic
   const fetchUserProfile = useCallback(async (userId: string): Promise<Profile | null> => {
@@ -138,74 +128,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       
-      // Clear any existing session first
-      await supabase.auth.signOut();
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim(),
       });
 
       if (error) {
-        console.error('[Auth] Login error:', error);
         return { error: error.message };
       }
 
-      if (!data.user) {
-        return { error: 'Authentication failed. Please try again.' };
-      }
-
-      // Fetch user profile with retry logic
-      const profile = await fetchUserProfile(data.user.id);
-      if (!profile) {
-        return { error: 'Failed to load user profile. Please try again.' };
-      }
-      
-      // Only navigate if router is ready
-      if (routerReady && router) {
-        router.push('/dashboard')
+      if (data?.user) {
+        const profile = await fetchUserProfile(data.user.id);
+        if (profile) {
+          setUser(profile);
+          // Only redirect if we're in the browser and mounted
+          if (isMounted) {
+            router.push('/dashboard');
+          }
+          return {};
+        }
+        return { error: 'Failed to load user profile' };
       }
       
-      return {};
+      return { error: 'Login failed. Please check your credentials.' };
       
     } catch (error: any) {
-      console.error('[Auth] Login exception:', error);
+      console.error('Login error:', error);
       return { 
-        error: error.message?.includes('Too Many Requests') 
-          ? 'Too many login attempts. Please wait a moment and try again.' 
-          : 'An unexpected error occurred. Please try again.'
+        error: error.message || 'An error occurred during login' 
       };
     } finally {
       setLoading(false);
     }
-  }, [router, routerReady]);
+  }, [fetchUserProfile, isMounted]);
 
   // Login with Google
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     try {
-      setLoading(true)
-      console.log("[Auth] Attempting Google OAuth login...")
-
+      setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider: 'google',
         options: {
-          redirectTo: process.env.NEXT_PUBLIC_SITE_URL + '/auth/callback',
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      })
-
-      if (error) {
-        console.error("[Auth] Google OAuth error:", error)
-        return { error: error.message }
-      }
-
-      return {}
-    } catch (error) {
-      console.error("[Auth] Google OAuth exception:", error)
-      return { error: 'Google sign-in failed' }
+      });
+      
+      if (error) throw error;
+      return { error: undefined };
+    } catch (error: any) {
+      console.error('Google OAuth error:', error);
+      return { error: error.message || 'Failed to sign in with Google' };
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, []);
 
   // Signup
   const signup = async (email: string, password: string, userData: any) => {
@@ -240,14 +220,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Logout
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setLoading(true)
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       
       setUser(null)
-      if (routerReady && router) {
+      if (isMounted) {
         router.push('/auth')
       }
     } catch (error) {
@@ -256,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isMounted]);
 
   // Update user profile
   const updateUser = async (updatedUser: Partial<Profile>) => {
@@ -286,6 +266,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Failed to update profile' }
     }
   }
+
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      setIsMounted(false)
+    }
+  }, [])
 
   const value = {
     user,

@@ -1,7 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Mail, Lock, UserPlus, LogIn, Heart, Users, AlertCircle } from "lucide-react"
 import { useAuth } from "./auth-provider"
-import { useRouter } from "next/router"
 
 const userRoles = [
   {
@@ -36,11 +35,12 @@ interface AuthFormsProps {
 
 export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
   const { login, loginWithGoogle, signup } = useAuth()
-  const router = useRouter()
+  const [isMounted, setIsMounted] = useState(false)
   const [activeTab, setActiveTab] = useState(initialMode === "signup" ? "signup" : "login")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const router = useRouter()
 
   const [loginData, setLoginData] = useState({
     email: "",
@@ -56,6 +56,13 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
     agreeToTerms: false,
     subscribeNewsletter: true,
   })
+
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      setIsMounted(false)
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,30 +84,24 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="mt-4 text-foreground/80">Signing in...</p>
-      </div>
-    );
-  }
-
   const handleGoogleLogin = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    const { error: googleError } = await loginWithGoogle()
-
-    if (googleError) {
-      setError(googleError)
-      setIsLoading(false)
-      return
+    if (!isMounted) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { error } = await loginWithGoogle();
+      if (error) {
+        setError(error);
+      }
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('Failed to sign in with Google');
+    } finally {
+      setIsLoading(false);
     }
-
-    // OAuth redirect will handle the rest
-    setIsLoading(false)
-  }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -135,6 +136,14 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
 
     setSuccess("Account created successfully! Please check your email to confirm your account.")
     setIsLoading(false)
+  }
+
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <div className="h-12 w-12"></div>
+      </div>
+    )
   }
 
   return (

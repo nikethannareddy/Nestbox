@@ -25,45 +25,51 @@ export default function HomePage() {
               <NestBoxLogo />
             </a>
             <nav className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
-                <a href="/map">Explore</a>
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
-                <a href="/learn">Build</a>
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
-                <a href="/about">About</a>
-              </Button>
+              <a href="/map" className="inline-block">
+                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
+                  Explore
+                </Button>
+              </a>
+              <a href="/learn" className="inline-block">
+                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
+                  Build
+                </Button>
+              </a>
+              <a href="/about" className="inline-block">
+                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
+                  About
+                </Button>
+              </a>
               {isAuthenticated && user?.role === "admin" && (
-                <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" asChild>
-                  <a href="/admin">
+                <a href="/admin" className="inline-block">
+                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50">
                     <Shield className="h-4 w-4 mr-2" />
                     Admin
-                  </a>
-                </Button>
+                  </Button>
+                </a>
               )}
               <div className="h-6 w-px bg-border/40 mx-2"></div>
               {isAuthenticated && user ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
-                  asChild
-                >
-                  <a href={getDashboardUrl()}>
+                <a href={getDashboardUrl()} className="inline-block">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
+                  >
                     <User className="h-4 w-4 mr-2" />
-                    {user.firstName} {user.lastName}
-                  </a>
-                </Button>
+                    {user.first_name} {user.last_name}
+                  </Button>
+                </a>
               ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-primary/30 hover:bg-primary/10 bg-transparent"
-                  asChild
-                >
-                  <a href="/auth">Sign In</a>
-                </Button>
+                <a href="/auth" className="inline-block">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-primary/30 hover:bg-primary/10 bg-transparent"
+                  >
+                    Sign In
+                  </Button>
+                </a>
               )}
             </nav>
             <Button
@@ -79,68 +85,71 @@ export default function HomePage() {
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 border-t border-border/20">
               <nav className="flex flex-col gap-2 pt-4">
-                <Button
-                  variant="ghost"
-                  className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  asChild
-                >
-                  <a href="/map">Explore</a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  asChild
-                >
-                  <a href="/nest-check">Monitor</a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  asChild
-                >
-                  <a href="/learn">Build</a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  asChild
-                >
-                  <a href="/about">About</a>
-                </Button>
-                {isAuthenticated && user?.role === "admin" && (
+                <a href="/map" className="inline-block">
                   <Button
                     variant="ghost"
-                    className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                    asChild
+                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
                   >
-                    <a href="/admin">
+                    Explore
+                  </Button>
+                </a>
+                <a href="/nest-check" className="inline-block">
+                  <Button
+                    variant="ghost"
+                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  >
+                    Monitor
+                  </Button>
+                </a>
+                <a href="/learn" className="inline-block">
+                  <Button
+                    variant="ghost"
+                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  >
+                    Build
+                  </Button>
+                </a>
+                <a href="/about" className="inline-block">
+                  <Button
+                    variant="ghost"
+                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  >
+                    About
+                  </Button>
+                </a>
+                {isAuthenticated && user?.role === "admin" && (
+                  <a href="/admin" className="inline-block">
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
                       <Shield className="h-4 w-4 mr-2" />
                       Admin
-                    </a>
-                  </Button>
+                    </Button>
+                  </a>
                 )}
                 <div className="border-t border-border/20 my-2"></div>
                 {isAuthenticated && user ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
-                    asChild
-                  >
-                    <a href={getDashboardUrl()}>
+                  <a href={getDashboardUrl()} className="inline-block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
+                    >
                       <User className="h-4 w-4 mr-2" />
-                      {user.firstName} {user.lastName}
-                    </a>
-                  </Button>
+                      {user.first_name} {user.last_name}
+                    </Button>
+                  </a>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="justify-start border-primary/30 hover:bg-primary/10 bg-transparent"
-                    asChild
-                  >
-                    <a href="/auth">Sign In</a>
-                  </Button>
+                  <a href="/auth" className="inline-block">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start border-primary/30 hover:bg-primary/10 bg-transparent"
+                    >
+                      Sign In
+                    </Button>
+                  </a>
                 )}
               </nav>
             </div>
@@ -161,35 +170,33 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button size="lg" className="text-lg px-10 py-4 bg-primary hover:bg-primary/90 shadow-lg" asChild>
-                <a href="/auth?mode=signup">
+              <a href="/auth?mode=signup" className="inline-block">
+                <Button size="lg" className="text-lg px-10 py-4 bg-primary hover:bg-primary/90 shadow-lg">
                   <Heart className="mr-2 h-5 w-5" />
                   Join Community
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </a>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="text-lg px-10 py-4 bg-sky-500/5 hover:bg-sky-500/10 text-sky-600 border-sky-500/30 hover:border-sky-500/50 shadow-lg"
-                asChild
-              >
-                <a href="/map">
+                </Button>
+              </a>
+              <a href="/map" className="inline-block">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-10 py-4 bg-sky-500/5 hover:bg-sky-500/10 text-sky-600 border-sky-500/30 hover:border-sky-500/50 shadow-lg"
+                >
                   <MapPin className="mr-2 h-5 w-5" />
                   Explore
-                </a>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="text-lg px-10 py-4 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-600 border-yellow-500/30 hover:border-yellow-500/50 shadow-lg"
-                asChild
-              >
-                <a href="/sponsor">
+                </Button>
+              </a>
+              <a href="/sponsor" className="inline-block">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-10 py-4 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-600 border-yellow-500/30 hover:border-yellow-500/50 shadow-lg"
+                >
                   <Heart className="mr-2 h-5 w-5" />
                   Sponsor a Box
-                </a>
-              </Button>
+                </Button>
+              </a>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -226,7 +233,6 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <Card
               className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-              asChild
             >
               <a href="/map">
                 <CardContent className="p-8 text-center">
@@ -243,7 +249,6 @@ export default function HomePage() {
 
             <Card
               className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-              asChild
             >
               <a href="/learn">
                 <CardContent className="p-8 text-center">
@@ -260,7 +265,6 @@ export default function HomePage() {
 
             <Card
               className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-              asChild
             >
               <a href="/dashboard">
                 <CardContent className="p-8 text-center">
@@ -277,7 +281,6 @@ export default function HomePage() {
 
             <Card
               className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-              asChild
             >
               <a href="/sponsor">
                 <CardContent className="p-8 text-center">
@@ -353,7 +356,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <NestBoxLogo />
             <div className="text-center md:text-right">
-              <p className="text-muted-foreground">© 2025 NestBox. Protecting birds, one box at a time.</p>
+              <p className="text-muted-foreground"> 2025 NestBox. Protecting birds, one box at a time.</p>
             </div>
           </div>
         </div>
