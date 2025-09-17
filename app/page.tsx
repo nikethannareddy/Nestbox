@@ -3,13 +3,13 @@
 import { useState } from "react"
 import { NestBoxLogo } from "@/components/nestbox-logo"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { MapPin, Users, Heart, ArrowRight, Calendar, Clock, MapIcon, Menu, Hammer, User, Shield } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
+import { AppHeader } from "@/components/layout/header"
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
 
   const getDashboardUrl = () => {
     if (!user) return "/auth"
@@ -18,145 +18,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/20 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <a href="/" className="hover:opacity-80 transition-opacity">
-              <NestBoxLogo />
-            </a>
-            <nav className="hidden md:flex items-center gap-2">
-              <a href="/map" className="inline-block">
-                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
-                  Explore
-                </Button>
-              </a>
-              <a href="/learn" className="inline-block">
-                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
-                  Build
-                </Button>
-              </a>
-              <a href="/about" className="inline-block">
-                <Button variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/10">
-                  About
-                </Button>
-              </a>
-              {isAuthenticated && user?.role === "admin" && (
-                <a href="/admin" className="inline-block">
-                  <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Admin
-                  </Button>
-                </a>
-              )}
-              <div className="h-6 w-px bg-border/40 mx-2"></div>
-              {isAuthenticated && user ? (
-                <a href={getDashboardUrl()} className="inline-block">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    {user.first_name} {user.last_name}
-                  </Button>
-                </a>
-              ) : (
-                <a href="/auth" className="inline-block">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-primary/30 hover:bg-primary/10 bg-transparent"
-                  >
-                    Sign In
-                  </Button>
-                </a>
-              )}
-            </nav>
-            <Button
-              className="md:hidden bg-transparent"
-              variant="outline"
-              size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {mobileMenuOpen && (
-            <div className="md:hidden mt-4 pb-4 border-t border-border/20">
-              <nav className="flex flex-col gap-2 pt-4">
-                <a href="/map" className="inline-block">
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  >
-                    Explore
-                  </Button>
-                </a>
-                <a href="/nest-check" className="inline-block">
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  >
-                    Monitor
-                  </Button>
-                </a>
-                <a href="/learn" className="inline-block">
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  >
-                    Build
-                  </Button>
-                </a>
-                <a href="/about" className="inline-block">
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  >
-                    About
-                  </Button>
-                </a>
-                {isAuthenticated && user?.role === "admin" && (
-                  <a href="/admin" className="inline-block">
-                    <Button
-                      variant="ghost"
-                      className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Shield className="h-4 w-4 mr-2" />
-                      Admin
-                    </Button>
-                  </a>
-                )}
-                <div className="border-t border-border/20 my-2"></div>
-                {isAuthenticated && user ? (
-                  <a href={getDashboardUrl()} className="inline-block">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start text-primary hover:text-primary/80 hover:bg-primary/10 font-medium"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      {user.first_name} {user.last_name}
-                    </Button>
-                  </a>
-                ) : (
-                  <a href="/auth" className="inline-block">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="justify-start border-primary/30 hover:bg-primary/10 bg-transparent"
-                    >
-                      Sign In
-                    </Button>
-                  </a>
-                )}
-              </nav>
-            </div>
-          )}
-        </div>
-      </header>
-
+      <AppHeader />
+      
       <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-card/50 to-secondary/10 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/placeholder-sd3f8.png')] opacity-5"></div>
         <div className="container mx-auto px-4 relative">
@@ -231,11 +94,9 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <Card
-              className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-            >
+            <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg cursor-pointer">
               <a href="/map">
-                <CardContent className="p-8 text-center">
+                <div className="text-center">
                   <div className="w-16 h-16 bg-primary/15 rounded-full flex items-center justify-center mx-auto mb-6">
                     <MapPin className="h-8 w-8 text-primary" />
                   </div>
@@ -243,15 +104,13 @@ export default function HomePage() {
                   <p className="text-muted-foreground leading-relaxed">
                     Discover nest boxes in your area and log activity.
                   </p>
-                </CardContent>
+                </div>
               </a>
-            </Card>
+            </div>
 
-            <Card
-              className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-            >
+            <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg cursor-pointer">
               <a href="/learn">
-                <CardContent className="p-8 text-center">
+                <div className="text-center">
                   <div className="w-16 h-16 bg-primary/15 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Hammer className="h-8 w-8 text-primary" />
                   </div>
@@ -259,15 +118,13 @@ export default function HomePage() {
                   <p className="text-muted-foreground leading-relaxed">
                     Access guides about local birds and building nest boxes.
                   </p>
-                </CardContent>
+                </div>
               </a>
-            </Card>
+            </div>
 
-            <Card
-              className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-            >
+            <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg cursor-pointer">
               <a href="/dashboard">
-                <CardContent className="p-8 text-center">
+                <div className="text-center">
                   <div className="w-16 h-16 bg-primary/15 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Users className="h-8 w-8 text-primary" />
                   </div>
@@ -275,15 +132,13 @@ export default function HomePage() {
                   <p className="text-muted-foreground leading-relaxed">
                     Join a community of volunteers monitoring nest boxes.
                   </p>
-                </CardContent>
+                </div>
               </a>
-            </Card>
+            </div>
 
-            <Card
-              className="border-border/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-card/50 cursor-pointer"
-            >
+            <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 border border-border/20 shadow-lg cursor-pointer">
               <a href="/sponsor">
-                <CardContent className="p-8 text-center">
+                <div className="text-center">
                   <div className="w-16 h-16 bg-primary/15 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Heart className="h-8 w-8 text-primary" />
                   </div>
@@ -291,9 +146,9 @@ export default function HomePage() {
                   <p className="text-muted-foreground leading-relaxed">
                     Support conservation and honor contributions to local birds.
                   </p>
-                </CardContent>
+                </div>
               </a>
-            </Card>
+            </div>
           </div>
         </div>
       </section>
@@ -306,8 +161,8 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="border-border/20 bg-card/70 hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
+            <div className="bg-card/70 border border-border/20 shadow-lg">
+              <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Calendar className="h-5 w-5 text-primary" />
                   <span className="font-semibold text-foreground">September 20, 2025</span>
@@ -324,11 +179,11 @@ export default function HomePage() {
                   <MapIcon className="h-4 w-4" />
                   <span>{"Borderland State Park"}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="border-border/20 bg-card/70 hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
+            <div className="bg-card/70 border border-border/20 shadow-lg">
+              <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Calendar className="h-5 w-5 text-primary" />
                   <span className="font-semibold text-foreground">September 27, 2025</span>
@@ -345,8 +200,8 @@ export default function HomePage() {
                   <MapIcon className="h-4 w-4" />
                   <span>Tidmarsh Wildlife Sanctuary, Plymouth</span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </section>

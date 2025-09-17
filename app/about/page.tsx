@@ -2,24 +2,13 @@ import { NestBoxLogo } from "@/components/nestbox-logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, CheckCircle, TreePine, Users, Heart, MapPin, BookOpen, Camera } from "lucide-react"
+import { AppHeader } from "@/components/layout/header"
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
-      <header className="border-b border-border/20 bg-card/30 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <NestBoxLogo />
-            <Button variant="outline" asChild>
-              <a href="/" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Home
-              </a>
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-background">
+      <AppHeader />
+      
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center mb-16">
@@ -190,7 +179,7 @@ export default function AboutPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <NestBoxLogo />
             <div className="text-center md:text-right">
-              <p className="text-muted-foreground">© 2025 NestBox. Protecting birds, one box at a time.</p>
+              <p className="text-muted-foreground"> 2025 NestBox. Protecting birds, one box at a time.</p>
             </div>
           </div>
         </div>

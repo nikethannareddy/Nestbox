@@ -83,33 +83,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
 
-    const handleAuthChange = async (event: any, session: any) => {
+    const handleAuthChange = async (event: string, session: any) => {
       if (!mounted) return;
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        await fetchUserProfile(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
+      
+      setLoading(true);
+      
+      try {
+        if (event === 'SIGNED_IN' && session?.user) {
+          await fetchUserProfile(session.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('[Auth] Auth state change error:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
 
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
     authSubscription = subscription;
 
-    // Initial session check
+    // Initial check for existing session
     const checkSession = async () => {
       try {
+        setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
+        
         if (session?.user) {
           await fetchUserProfile(session.user.id);
         } else {
-          setLoading(false);
+          setUser(null);
         }
       } catch (error) {
         console.error('[Auth] Session check error:', error);
-        setLoading(false);
+        setUser(null);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -222,21 +237,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Logout
   const logout = useCallback(async () => {
     try {
-      setLoading(true)
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       
-      setUser(null)
-      if (isMounted) {
-        router.push('/auth')
-      }
+      // Clear user state
+      setUser(null);
+      
+      // Force a refresh to ensure all components get the updated auth state
+      window.location.href = '/';
+      
     } catch (error) {
-      console.error('[Auth] Logout error:', error)
-      throw error
+      console.error('[Auth] Logout error:', error);
+      throw error;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [isMounted]);
+  }, []);
 
   // Update user profile
   const updateUser = async (updatedUser: Partial<Profile>) => {
