@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 
@@ -13,7 +15,8 @@ interface MapComponentProps {
       lng: number;
     };
     title?: string;
-    icon?: string;
+    icon?: google.maps.Symbol | google.maps.Icon | string;
+    [key: string]: any;
   }>;
   onMapClick?: (e: google.maps.MapMouseEvent) => void;
   onMarkerClick?: (marker: google.maps.Marker, index: number) => void;
@@ -27,7 +30,7 @@ declare global {
   }
 }
 
-export default function MapComponent({
+export function MapComponent({
   center,
   zoom = 12,
   markers = [],
@@ -149,7 +152,7 @@ export default function MapComponent({
     if (mapInstance.current && mapLoaded) {
       mapInstance.current.setCenter(center);
     }
-  }, [center.lat, center.lng, mapLoaded]);
+  }, [center, mapLoaded]);
 
   // Update zoom when it changes
   useEffect(() => {
@@ -159,17 +162,13 @@ export default function MapComponent({
   }, [zoom, mapLoaded]);
 
   return (
-    <div className={className} ref={mapRef}>
-      {!apiKey && (
-        <div className="flex h-full items-center justify-center bg-gray-100">
-          <p>Google Maps API key is not configured.</p>
-        </div>
-      )}
-      {apiKey && !mapLoaded && (
-        <div className="flex h-full items-center justify-center bg-gray-100">
-          <p>Loading map...</p>
-        </div>
-      )}
-    </div>
+    <div 
+      ref={mapRef} 
+      className={className}
+      style={{ 
+        minHeight: '400px',
+        backgroundColor: '#e5e7eb' // Light gray background while loading
+      }}
+    />
   );
 }
