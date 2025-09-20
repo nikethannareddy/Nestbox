@@ -250,22 +250,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
+      setError(null);
+      
+      // Start the OAuth flow
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
-      if (error) throw error;
+
+      if (oauthError) {
+        console.error('Google OAuth error:', oauthError);
+        setError(oauthError.message || 'Failed to sign in with Google');
+        return { error: oauthError.message };
+      }
+
+      // The actual user data will be handled by the auth state change listener
       return { error: undefined };
-    } catch (error: any) {
-      console.error('Google OAuth error:', error);
-      return { error: error.message || 'Failed to sign in with Google' };
+    } catch (err) {
+      console.error('Error during Google sign in:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to sign in with Google';
+      setError(errorMessage);
+      return { error: errorMessage };
     } finally {
       setLoading(false);
     }
