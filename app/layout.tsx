@@ -7,12 +7,14 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-space-grotesk",
+  preload: false, // Disable automatic preloading
 })
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-dm-sans",
+  preload: false, // Disable automatic preloading
 })
 
 export const metadata: Metadata = {
@@ -28,6 +30,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${dmSans.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Preload fonts with proper attributes */}
+        <link
+          rel="preload"
+          href={spaceGrotesk.url}
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href={dmSans.url}
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <ClientWrapper>
           {children}
