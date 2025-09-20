@@ -1,267 +1,359 @@
-"use client";
+"use client"
 
-import { useState, useRef } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Icons } from '@/components/icons';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/use-toast';
+import { useState, useRef, useEffect } from 'react';
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/components/ui/use-toast"
+import { Icons } from "@/components/icons"
+import { cn } from "@/lib/utils"
+import QRCode from "qrcode.react"
 import html2canvas from 'html2canvas';
-import { QrCodeGenerator } from './QrCodeGenerator';
 
 interface QrCodeGeneratorProps {
   nestBoxId: string;
-  nestBoxName: string;
-  qrCodeId?: string;
-  qrCodeUrl?: string;
-  onGenerate: () => Promise<{ qrCodeId: string; qrCodeUrl: string }>;
+  latitude?: number;
+  longitude?: number;
+  onGenerate?: (data: { qrCodeUrl: string; printData: any }) => void;
   className?: string;
 }
 
-export function QrCodeGenerator({
-  nestBoxId,
-  nestBoxName,
-  qrCodeId: initialQrCodeId,
-  qrCodeUrl: initialQrCodeUrl,
+export function QrCodeGenerator({ 
+  nestBoxId, 
+  latitude, 
+  longitude, 
   onGenerate,
-  className = '',
+  className 
 }: QrCodeGeneratorProps) {
-  const [qrCodeId, setQrCodeId] = useState(initialQrCodeId);
-  const [qrCodeUrl, setQrCodeUrl] = useState(initialQrCodeUrl);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
-  const qrCodeRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<number>(256);
+  const [bgColor, setBgColor] = useState<string>("#ffffff");
+  const [fgColor, setFgColor] = useState<string>("#000000");
+  const [includeLogo, setIncludeLogo] = useState<boolean>(true);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const qrRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const handleGenerate = async () => {
-    try {
-      setIsGenerating(true);
-      const result = await onGenerate();
-      setQrCodeId(result.qrCodeId);
-      setQrCodeUrl(result.qrCodeUrl);
-      toast({
-        title: 'QR Code Generated',
-        description: 'The QR code has been successfully generated.',
-      });
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate QR code. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGenerating(false);
+  // Generate the URL for the QR code
+  const generateQrCodeUrl = (): string => {
+    const baseUrl = `${window.location.origin}/nestbox/${nestBoxId}`;
+    const params = new URLSearchParams();
+    
+    if (latitude !== undefined && longitude !== undefined) {
+      params.append('lat', latitude.toString());
+      params.append('lng', longitude.toString());
     }
+    
+    return params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
   };
 
-  const handlePrint = async () => {
-    if (!qrCodeRef.current) return;
+  const qrCodeUrl = generateQrCodeUrl();
 
-    try {
-      setIsPrinting(true);
-      
-      // Create a new window for printing
+  // Handle print functionality
+  const handlePrint = () => {
+    if (!qrRef.current) return;
+    
+    setIsGenerating(true);
+    
+    // Use html2canvas to capture the QR code with higher DPI for print
+    html2canvas(qrRef.current, {
+      scale: 2, // Higher scale for better print quality
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: bgColor,
+    }).then(canvas => {
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        throw new Error('Could not open print window');
+        toast({
+          title: "Error",
+          description: "Could not open print window. Please check your popup blocker.",
+          variant: "destructive",
+        });
+        return;
       }
-
-      // Create a canvas from the QR code
-      const canvas = await html2canvas(qrCodeRef.current, {
-        scale: 2, // Higher quality
-        backgroundColor: null,
-        logging: false,
-      });
-
-      // Create the print content
+      
       const printContent = `
         <!DOCTYPE html>
         <html>
-        <head>
-          <title>NestBox QR Code - ${nestBoxName}</title>
-          <style>
-            @page { margin: 0; }
-            body { 
-              margin: 0;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              padding: 20px;
-              text-align: center;
-            }
-            .print-container {
-              max-width: 300px;
-              margin: 0 auto;
-            }
-            .qr-code {
-              margin: 0 auto 20px;
-              padding: 10px;
-              background: white;
-              border-radius: 8px;
-            }
-            h1 {
-              font-size: 20px;
-              margin: 0 0 10px 0;
-              color: #333;
-            }
-            p {
-              margin: 5px 0;
-              color: #666;
-              font-size: 14px;
-            }
-            .instructions {
-              margin-top: 20px;
-              font-size: 12px;
-              color: #999;
-              border-top: 1px solid #eee;
-              padding-top: 10px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-container">
-            <h1>${nestBoxName}</h1>
-            <p>Nest Box ID: ${nestBoxId}</p>
-            <div class="qr-code">
-              <img src="${canvas.toDataURL('image/png')}" alt="QR Code" style="max-width: 100%;" />
+          <head>
+            <title>Nest Box QR Code - ${nestBoxId}</title>
+            <style>
+              body { 
+                margin: 0; 
+                padding: 20px; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                min-height: 100vh;
+                font-family: Arial, sans-serif;
+              }
+              .container { 
+                text-align: center; 
+                max-width: 100%;
+              }
+              h1 { 
+                margin-bottom: 20px; 
+                color: #333;
+              }
+              .qr-container { 
+                margin: 0 auto; 
+                padding: 20px; 
+                background: white; 
+                border-radius: 8px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 100%;
+              }
+              .info {
+                margin-top: 20px;
+                color: #666;
+                font-size: 14px;
+              }
+              @media print {
+                body { padding: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Nest Box #${nestBoxId}</h1>
+              <div class="qr-container">
+                <img src="${canvas.toDataURL('image/png')}" alt="QR Code" style="max-width: 100%; height: auto;" />
+              </div>
+              <p class="info">Scan this QR code to view nest box details and report sightings</p>
+              <div class="no-print" style="margin-top: 20px;">
+                <p>Press Ctrl+P to print or use your browser's print function</p>
+                <button onclick="window.print()" style="margin-top: 10px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                  Print QR Code
+                </button>
+                <button onclick="window.close()" style="margin-top: 10px; margin-left: 10px; padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                  Close
+                </button>
+              </div>
             </div>
-            <p>Scan to view nest box details</p>
-            <div class="instructions">
-              <p>Place this label on the nest box in a visible location.</p>
-              <p>Scan the QR code to view nest box information and report issues.</p>
-            </div>
-          </div>
-          <script>
-            // Print when the window loads
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                window.onafterprint = function() {
-                  window.close();
-                };
-              }, 500);
-            };
-          </script>
-        </body>
+          </body>
         </html>
       `;
-
-      // Write the content to the new window
+      
+      printWindow.document.open();
       printWindow.document.write(printContent);
       printWindow.document.close();
-    } catch (error) {
-      console.error('Error printing QR code:', error);
+      
+      // Auto-print after a short delay to ensure content is loaded
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+      
+    }).catch(error => {
+      console.error('Error generating print preview:', error);
       toast({
-        title: 'Print Error',
-        description: 'Failed to prepare the print preview. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to generate print preview. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setIsPrinting(false);
-    }
+    }).finally(() => {
+      setIsGenerating(false);
+    });
   };
 
-  return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle>QR Code</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {qrCodeId && qrCodeUrl ? (
-          <div className="flex flex-col items-center space-y-4">
-            <div 
-              ref={qrCodeRef}
-              className="p-4 bg-white rounded-lg border border-gray-200 flex flex-col items-center"
-            >
-              <QRCodeSVG 
-                value={qrCodeUrl} 
-                size={200} 
-                level="H"
-                includeMargin={true}
-                className="w-full h-auto max-w-[200px]"
-              />
-              <p className="mt-2 text-sm text-gray-500 text-center">
-                {nestBoxName}
-              </p>
-            </div>
-            
-            <div className="w-full space-y-2">
-              <div className="space-y-1">
-                <Label htmlFor="qr-code-id">QR Code ID</Label>
-                <Input 
-                  id="qr-code-id" 
-                  value={qrCodeId} 
-                  readOnly 
-                  className="font-mono text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="qr-code-url">QR Code URL</Label>
-                <Input 
-                  id="qr-code-url" 
-                  value={qrCodeUrl} 
-                  readOnly 
-                  className="text-sm"
-                />
-              </div>
-            </div>
+  // Handle download functionality
+  const handleDownload = () => {
+    if (!qrRef.current) return;
+    
+    setIsGenerating(true);
+    
+    html2canvas(qrRef.current, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: bgColor,
+    }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = `nestbox-qr-${nestBoxId}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }).catch(error => {
+      console.error('Error generating download:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate download. Please try again.",
+        variant: "destructive",
+      });
+    }).finally(() => {
+      setIsGenerating(false);
+    });
+  };
 
-            <div className="flex gap-2 w-full">
-              <Button 
-                variant="outline" 
+  // Notify parent component when the QR code is generated
+  useEffect(() => {
+    if (onGenerate) {
+      onGenerate({
+        qrCodeUrl,
+        printData: {
+          nestBoxId,
+          latitude,
+          longitude,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    }
+  }, [qrCodeUrl, nestBoxId, latitude, longitude, onGenerate]);
+
+  return (
+    <div className={cn("space-y-6", className)}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="size">QR Code Size</Label>
+            <Select 
+              value={size.toString()} 
+              onValueChange={(value) => setSize(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="128">Small (128px)</SelectItem>
+                <SelectItem value="256">Medium (256px)</SelectItem>
+                <SelectItem value="384">Large (384px)</SelectItem>
+                <SelectItem value="512">Extra Large (512px)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="bgColor">Background Color</Label>
+            <div className="flex items-center gap-2">
+              <Input 
+                type="color" 
+                id="bgColor" 
+                value={bgColor} 
+                onChange={(e) => setBgColor(e.target.value)} 
+                className="w-16 h-10 p-1"
+              />
+              <Input 
+                type="text" 
+                value={bgColor} 
+                onChange={(e) => setBgColor(e.target.value)} 
                 className="flex-1"
-                onClick={handlePrint}
-                disabled={isPrinting}
-              >
-                {isPrinting ? (
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.printer className="mr-2 h-4 w-4" />
-                )}
-                Print QR Code
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={handleGenerate}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.refreshCw className="mr-2 h-4 w-4" />
-                )}
-                Regenerate
-              </Button>
+              />
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col items-center space-y-4 p-4">
-            <Icons.qrCode className="h-12 w-12 text-gray-300" />
-            <p className="text-sm text-gray-500 text-center">
-              No QR code has been generated for this nest box yet.
-            </p>
+          
+          <div className="space-y-2">
+            <Label htmlFor="fgColor">Foreground Color</Label>
+            <div className="flex items-center gap-2">
+              <Input 
+                type="color" 
+                id="fgColor" 
+                value={fgColor} 
+                onChange={(e) => setFgColor(e.target.value)} 
+                className="w-16 h-10 p-1"
+              />
+              <Input 
+                type="text" 
+                value={fgColor} 
+                onChange={(e) => setFgColor(e.target.value)} 
+                className="flex-1"
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              id="includeLogo" 
+              checked={includeLogo} 
+              onChange={(e) => setIncludeLogo(e.target.checked)} 
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <Label htmlFor="includeLogo">Include NestBox Logo</Label>
+          </div>
+          
+          <div className="pt-2 space-y-2">
             <Button 
-              onClick={handleGenerate}
+              onClick={handlePrint} 
               disabled={isGenerating}
-              className="mt-2"
+              className="w-full"
             >
-              {isGenerating ? (
-                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.qrCode className="mr-2 h-4 w-4" />
-              )}
-              Generate QR Code
+              <Icons.printer className="mr-2 h-4 w-4" />
+              {isGenerating ? 'Generating...' : 'Print QR Code'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleDownload}
+              disabled={isGenerating}
+              className="w-full"
+            >
+              <Icons.download className="mr-2 h-4 w-4" />
+              {isGenerating ? 'Generating...' : 'Download QR Code'}
             </Button>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center p-6 border rounded-lg bg-white">
+          <div 
+            ref={qrRef}
+            className="p-4 bg-white rounded-lg"
+            style={{ backgroundColor: bgColor }}
+          >
+            <QRCode
+              value={qrCodeUrl}
+              size={size}
+              bgColor={bgColor}
+              fgColor={fgColor}
+              level="H"
+              includeMargin={true}
+              renderAs="svg"
+              imageSettings={
+                includeLogo
+                  ? {
+                      src: '/logo.svg',
+                      height: size * 0.2,
+                      width: size * 0.2,
+                      excavate: true,
+                    }
+                  : undefined
+              }
+            />
+          </div>
+          
+          <div className="mt-4 text-center text-sm text-gray-500">
+            <p>Scan this QR code to view nest box details</p>
+            <p className="text-xs mt-1">Nest Box ID: {nestBoxId}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h3 className="font-medium text-sm mb-2">QR Code URL:</h3>
+        <div className="flex items-center gap-2">
+          <Input 
+            value={qrCodeUrl} 
+            readOnly 
+            className="font-mono text-xs"
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(qrCodeUrl);
+              toast({
+                title: "Copied!",
+                description: "QR Code URL has been copied to clipboard.",
+              });
+            }}
+          >
+            <Icons.copy className="h-4 w-4 mr-2" />
+            Copy
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
+
+export default QrCodeGenerator;

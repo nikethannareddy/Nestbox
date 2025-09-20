@@ -15,15 +15,21 @@ const statusColors = {
   active: "bg-green-500",
   inactive: "bg-gray-400",
   maintenance: "bg-red-500",
+  maintenance_needed: "bg-yellow-500",
+  removed: "bg-gray-600",
   retired: "bg-gray-600",
 }
 
 const statusLabels = {
   active: "Active",
   inactive: "Inactive",
-  maintenance: "Needs Maintenance",
+  maintenance: "Maintenance",
+  maintenance_needed: "Needs Maintenance",
+  removed: "Removed",
   retired: "Retired",
-}
+} as const;
+
+type NestBoxStatus = keyof typeof statusLabels;
 
 const maintenanceStatusColors = {
   excellent: "bg-green-500",
@@ -44,7 +50,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<NestBoxStatus>("active")
   const [speciesFilter, setSpeciesFilter] = useState("all")
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(initialCenter || null)
   const [zoom, setZoom] = useState(initialZoom)
@@ -71,7 +77,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
         box.qr_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (box.target_species && box.target_species.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
 
-      const matchesStatus = statusFilter === "all" || box.status === statusFilter
+      const matchesStatus = statusFilter === "active" || box.status === statusFilter
       const matchesSpecies =
         speciesFilter === "all" || (box.target_species && box.target_species.includes(speciesFilter))
 
@@ -204,11 +210,11 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
                 <div className="flex items-center mt-2">
                   <span
                     className={`inline-block w-3 h-3 rounded-full mr-2 ${
-                      statusColors[box.status as keyof typeof statusColors] || "bg-gray-300"
+                      statusColors[box.status as NestBoxStatus] || "bg-gray-300"
                     }`}
                   ></span>
                   <span className="text-sm text-gray-700">
-                    {statusLabels[box.status as keyof typeof statusLabels] || box.status}
+                    {statusLabels[box.status as NestBoxStatus] || box.status}
                   </span>
                 </div>
               </div>
@@ -227,7 +233,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Status:</span>
                 <Badge variant="secondary" className="text-xs">
-                  {statusLabels[box.status]}
+                  {statusLabels[box.status as NestBoxStatus]}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
@@ -326,7 +332,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
           <div class="p-3 max-w-xs">
             <h3 class="font-semibold text-lg mb-2">${box.name}</h3>
             <div class="space-y-1 text-sm">
-              <p><strong>Status:</strong> ${statusLabels[box.status as keyof typeof statusLabels] || box.status}</p>
+              <p><strong>Status:</strong> ${statusLabels[box.status as NestBoxStatus] || box.status}</p>
               <p><strong>Species:</strong> ${box.target_species?.join(", ") || "Various"}</p>
               <p><strong>Location:</strong> ${box.latitude.toFixed(6)}, ${box.longitude.toFixed(6)}</p>
               <p><strong>Description:</strong> ${box.description || "No description"}</p>
@@ -367,7 +373,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
     })
   }
 
-  const getMarkerColor = (status: string) => {
+  const getMarkerColor = (status: NestBoxStatus) => {
     switch (status) {
       case "active":
         return "#10b981" // green
@@ -375,6 +381,10 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
         return "#9ca3af" // gray
       case "maintenance":
         return "#ef4444" // red
+      case "maintenance_needed":
+        return "#f59e0b" // yellow
+      case "removed":
+        return "#6b7280" // dark gray
       case "retired":
         return "#6b7280" // dark gray
       default:
@@ -456,10 +466,11 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="maintenance">Needs Maintenance</SelectItem>
+                <SelectItem value="maintenance_needed">Needs Maintenance</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="removed">Removed</SelectItem>
                 <SelectItem value="retired">Retired</SelectItem>
               </SelectContent>
             </Select>
@@ -486,6 +497,10 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-gray-400"></div>
               <span>Inactive ({nestBoxes.filter((b) => b.status === "inactive").length})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>Needs Maintenance ({nestBoxes.filter((b) => b.status === "maintenance_needed").length})</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>

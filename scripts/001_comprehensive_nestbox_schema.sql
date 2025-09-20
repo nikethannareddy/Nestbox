@@ -17,7 +17,7 @@ CREATE TABLE public.profiles (
   full_name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT,
-  role TEXT NOT NULL DEFAULT 'volunteer' CHECK (role IN ('volunteer', 'admin', 'sponsor', 'guest')),
+  role TEXT NOT NULL DEFAULT 'volunteer' CHECK (role IN ('volunteer', 'admin', 'sponsor')),
   bio TEXT,
   location TEXT,
   emergency_contact TEXT,
@@ -337,7 +337,7 @@ BEGIN
     NEW.id,
     COALESCE(NEW.raw_user_meta_data ->> 'full_name', 'New User'),
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data ->> 'role', 'volunteer')
+    'volunteer' -- Always set to volunteer by default
   )
   ON CONFLICT (id) DO NOTHING;
   

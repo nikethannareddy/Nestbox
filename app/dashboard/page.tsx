@@ -7,22 +7,22 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { AppHeader } from "@/components/layout/header"
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!loading && !isAuthenticated) {
       router.push("/auth")
       return
     }
     
     // Redirect admin users to the admin dashboard
-    if (user?.role === "admin") {
+    if (!loading && isAuthenticated && user?.role === "admin") {
       router.push("/admin")
     }
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user, router, loading])
 
-  if (!isAuthenticated || !user) {
+  if (loading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
         <div className="text-center">
@@ -37,7 +37,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
       <AppHeader />
       <main className="container mx-auto px-4 py-8">
-        <VolunteerDashboard />
+        <VolunteerDashboard user={user} />
       </main>
     </div>
   )

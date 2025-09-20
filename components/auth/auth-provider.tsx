@@ -12,13 +12,15 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
 interface AuthContextType {
   user: Profile | null
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<{ error?: string }>
+  login: (email: string, password: string) => Promise<{ error?: string, user?: Profile }>
   loginWithGoogle: () => Promise<{ error?: string }>
   signup: (email: string, password: string, userData: any) => Promise<{ error?: string }>
   logout: () => Promise<void>
   updateUser: (updatedUser: Partial<Profile>) => Promise<{ error?: string }>
   hasRole: (role: string | string[]) => boolean
   loading: boolean
+  error: string | null
+  setError: (error: string | null) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -37,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.includes(user.role)
   }, [user])
 
-  // Fetch user profile from database with retry logic
+  // Fetch user profile from database with retry logic and auto-create if missing
   const fetchUserProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     if (!userId) return null;
     
@@ -46,102 +49,165 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     while (retryCount < MAX_RETRIES) {
       try {
-        const { data, error } = await supabase
+        // First try to get the profile
+        let { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
 
-        if (error) throw error;
-        
-        if (data) {
-          const userData = {
-            ...data,
-            is_admin: data.role === 'admin',
+        // If no profile exists, create one
+        if (error?.code === 'PGRST116' || !profile) {
+          console.log('[Auth] No profile found, creating new one for user:', userId);
+          
+          // Get user data from auth
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) return null;
+          
+          // Create new profile
+          const newProfile = {
+            id: userId,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            avatar_url: user.user_metadata?.avatar_url || null,
+            is_admin: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
-          setUser(userData);
-          return userData;
+          
+          const { data: insertedProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert(newProfile)
+            .select()
+            .single();
+            
+          if (insertError) {
+            console.error('[Auth] Error creating profile:', insertError);
+            return null;
+          }
+          
+          console.log('[Auth] Created new profile:', insertedProfile);
+          return insertedProfile;
         }
-      } catch (error: any) {
-        if (error.message?.includes('Too Many Requests') && retryCount < MAX_RETRIES - 1) {
-          // Wait for an increasing amount of time before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          retryCount++;
-          continue;
+        
+        if (error) throw error;
+        return profile;
+        
+      } catch (error) {
+        console.error(`[Auth] Error fetching profile (attempt ${retryCount + 1}):`, error);
+        retryCount++;
+        
+        // Wait before retrying
+        if (retryCount < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        } else {
+          console.error('[Auth] Max retries reached, giving up');
+          return null;
         }
-        console.error('[Auth] Error fetching profile:', error);
-        await supabase.auth.signOut();
-        setUser(null);
-        return null;
       }
     }
     
     return null;
-  }, []);
+  }, [supabase]);
 
+  // Debug log when user state changes
   useEffect(() => {
-    let mounted = true;
-    let authSubscription: { unsubscribe: () => void } | null = null;
+    console.log('[Auth] User state updated:', { 
+      user: user ? { id: user.id, email: user.email, role: user.role } : null, 
+      isAuthenticated: !!user,
+      loading 
+    });
+  }, [user, loading]);
 
-    const handleAuthChange = async (event: string, session: any) => {
-      if (!mounted) return;
-      
-      setLoading(true);
-      
-      try {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await fetchUserProfile(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
+  // Enhanced auth state change handler
+  const handleAuthChange = useCallback(async (event: string, session: any) => {
+    console.log('[Auth] Auth state changed:', { event, session: session ? 'Session exists' : 'No session' });
+    
+    setLoading(true);
+    
+    try {
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('[Auth] User signed in, fetching profile...', { userId: session.user.id });
+        const profile = await fetchUserProfile(session.user.id);
+        
+        if (profile) {
+          console.log('[Auth] Profile loaded successfully:', { 
+            userId: profile.id, 
+            email: profile.email, 
+            role: profile.role 
+          });
+          setUser(profile);
+        } else {
+          console.error('[Auth] Failed to load profile for user:', session.user.id);
           setUser(null);
         }
-      } catch (error) {
-        console.error('[Auth] Auth state change error:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[Auth] User signed out');
+        setUser(null);
       }
-    };
+    } catch (error) {
+      console.error('[Auth] Error in auth state change handler:', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchUserProfile]);
 
+  // Initialize auth state
+  useEffect(() => {
+    console.log('[Auth] Initializing auth state...');
+    
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
-    authSubscription = subscription;
 
-    // Initial check for existing session
+    // Check for existing session
     const checkSession = async () => {
       try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Auth] Checking for existing session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[Auth] Error getting session:', error);
+          return;
+        }
+        
+        console.log('[Auth] Session check result:', { 
+          hasSession: !!session, 
+          userId: session?.user?.id 
+        });
         
         if (session?.user) {
-          await fetchUserProfile(session.user.id);
+          console.log('[Auth] Found existing session, fetching profile...');
+          const profile = await fetchUserProfile(session.user.id);
+          console.log('[Auth] Profile from session:', profile ? 'Exists' : 'Not found');
+          setUser(profile);
         } else {
+          console.log('[Auth] No active session found');
           setUser(null);
         }
       } catch (error) {
         console.error('[Auth] Session check error:', error);
         setUser(null);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
     checkSession();
 
     return () => {
-      mounted = false;
-      if (authSubscription) {
-        authSubscription.unsubscribe();
-      }
+      console.log('[Auth] Cleaning up auth listener');
+      subscription?.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, [handleAuthChange, fetchUserProfile]);
 
   // Login with email and password
   const login = useCallback(async (email: string, password: string) => {
     try {
+      console.log('[Auth] Attempting login for:', email);
       setLoading(true);
+      setError(null);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -149,33 +215,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        return { error: error.message };
+        console.error('[Auth] Login error:', error);
+        throw error;
       }
 
-      if (data?.user) {
-        const profile = await fetchUserProfile(data.user.id);
-        if (profile) {
-          setUser(profile);
-          // Only redirect if we're in the browser and mounted
-          if (isMounted) {
-            router.push('/dashboard');
-          }
-          return {};
-        }
-        return { error: 'Failed to load user profile' };
+      if (!data.user) {
+        throw new Error('No user data returned from sign in');
       }
+
+      console.log('[Auth] User signed in, fetching profile...', data.user);
       
-      return { error: 'Login failed. Please check your credentials.' };
+      // Ensure the user profile exists
+      const profile = await fetchUserProfile(data.user.id);
       
-    } catch (error: any) {
-      console.error('Login error:', error);
-      return { 
-        error: error.message || 'An error occurred during login' 
-      };
+      if (!profile) {
+        console.error('[Auth] Failed to create/fetch user profile');
+        throw new Error('Failed to initialize user profile');
+      }
+
+      console.log('[Auth] User profile:', profile);
+      setUser(profile);
+      
+      return { user: profile };
+    } catch (error) {
+      console.error('[Auth] Login exception:', error);
+      setError(error instanceof Error ? error.message : 'Failed to sign in');
+      return { error: error instanceof Error ? error.message : 'Failed to sign in' };
     } finally {
       setLoading(false);
     }
-  }, [fetchUserProfile, isMounted]);
+  }, [fetchUserProfile]);
 
   // Login with Google
   const loginWithGoogle = useCallback(async () => {
@@ -205,34 +274,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Signup
   const signup = async (email: string, password: string, userData: any) => {
     try {
-      setLoading(true)
-      console.log("[Auth] Attempting signup for:", email)
+      setLoading(true);
+      console.log("[Auth] Attempting signup for:", email);
 
-      const { data, error } = await supabase.auth.signUp({
+      // 1. Sign up the user with Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: `${userData.firstName} ${userData.lastName}`,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
             phone: userData.phone,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
-      })
+      });
 
-      if (error) {
-        console.error("[Auth] Signup error:", error)
-        return { error: error.message }
+      if (signUpError) {
+        console.error("[Auth] Signup error:", signUpError);
+        return { error: signUpError.message };
       }
 
-      console.log("[Auth] Signup successful, confirmation email sent")
-      return {}
+      // 2. If signup was successful, create a profile in the database
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: authData.user.id,
+              email: email,
+              first_name: userData.firstName,
+              last_name: userData.lastName,
+              phone: userData.phone,
+              role: 'volunteer',
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (profileError) {
+          console.error('[Auth] Error creating user profile:', profileError);
+          // We don't want to fail the signup if profile creation fails, as the user is already created in auth
+          // The profile can be created later when the user verifies their email
+        }
+      }
+
+      console.log("[Auth] Signup successful, confirmation email sent");
+      return {};
     } catch (error) {
-      console.error("[Auth] Signup exception:", error)
-      return { error: 'Signup failed' }
+      console.error("[Auth] Signup exception:", error);
+      return { error: 'Signup failed. Please try again.' };
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Logout
   const logout = useCallback(async () => {
@@ -301,6 +396,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUser,
     hasRole,
     loading,
+    error,
+    setError,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
