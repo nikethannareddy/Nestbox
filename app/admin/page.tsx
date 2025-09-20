@@ -32,6 +32,13 @@ import {
 import { AlertCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { DashboardOverview } from "@/components/admin/dashboard-overview"
+import { NestBoxesList } from "@/components/admin/nest-boxes-list"
+import { VolunteersList } from "@/components/admin/volunteers-list"
+import { ActivityLogsList } from "@/components/admin/activity-logs-list"
+import { AssignmentsList } from "@/components/admin/assignments-list"
 
 // Updated interfaces to match the database schema
 interface NestBox {
@@ -133,183 +140,157 @@ interface VolunteerAssignment {
 }
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated } = useAuth()
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("overview")
-  const [nestBoxes, setNestBoxes] = useState<NestBox[]>([])
-  const [volunteers, setVolunteers] = useState<Profile[]>([])
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
-  const [assignments, setAssignments] = useState<VolunteerAssignment[]>([])
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const [dataLoading, setDataLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [nestBoxes, setNestBoxes] = useState<NestBox[]>([]);
+  const [volunteers, setVolunteers] = useState<Profile[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [assignments, setAssignments] = useState<VolunteerAssignment[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Redirect if not authenticated or not admin
+  // Handle authentication and data loading
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/auth")
-      return
-    }
-    
-    if (user?.role !== "admin") {
-      router.push("/dashboard")
-      return
-    }
-    
-    // Load data
-    const loadData = async () => {
-      try {
-        const supabase = createClient()
-        
-        // Fetch nest boxes
-        const { data: boxes } = await supabase
-          .from('nest_boxes')
-          .select('*')
-          .order('created_at', { ascending: false })
-        
-        // Fetch volunteers
-        const { data: volunteersData } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false })
-        
-        // Fetch activity logs
-        const { data: logs } = await supabase
-          .from('activity_logs')
-          .select('*')
-          .order('observation_date', { ascending: false })
-          .limit(10)
-        
-        // Fetch assignments
-        const { data: assignmentsData } = await supabase
-          .from('volunteer_assignments')
-          .select('*')
-          .order('due_date', { ascending: true })
-        
-        setNestBoxes(boxes || [])
-        setVolunteers(volunteersData || [])
-        setActivityLogs(logs || [])
-        setAssignments(assignmentsData || [])
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
+    const checkAuthAndLoadData = async () => {
+      // If still loading auth, wait
+      if (authLoading) return;
+
+      // If not authenticated, redirect to login
+      if (!isAuthenticated) {
+        router.replace('/auth');
+        return;
       }
-    }
-    
-    loadData()
-  }, [isAuthenticated, user, router])
 
-  if (!isAuthenticated || user?.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2 text-emerald-900">Loading...</h2>
-          <p className="text-emerald-700">Please wait while we verify your access.</p>
-        </div>
-      </div>
-    )
-  }
+      // If not admin, redirect to dashboard
+      if (user?.role !== 'admin') {
+        router.replace('/dashboard');
+        return;
+      }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-emerald-600" />
-          <h2 className="text-xl font-semibold mb-2 text-emerald-900">Loading Dashboard...</h2>
-          <p className="text-emerald-700">Please wait while we load your data.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-emerald-900">Admin Dashboard</h1>
-            <p className="text-emerald-700">Welcome back, {user?.firstName || 'Admin'}!</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/nest-boxes/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Nest Box
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Nest Boxes</CardTitle>
-              <div className="h-4 w-4 text-emerald-500">
-                <MapPin className="h-4 w-4" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{nestBoxes.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {nestBoxes.filter(box => box.is_active).length} active
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Volunteers</CardTitle>
-              <div className="h-4 w-4 text-emerald-500">
-                <Users className="h-4 w-4" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {volunteers.filter(v => v.role === 'volunteer').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {volunteers.filter(v => v.role === 'admin').length} admins
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-              <div className="h-4 w-4 text-emerald-500">
-                <Flag className="h-4 w-4" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activityLogs.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {activityLogs.filter(log => log.verified).length} verified
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Assignments</CardTitle>
-              <div className="h-4 w-4 text-emerald-500">
-                <Wrench className="h-4 w-4" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {assignments.filter(a => a.status !== 'completed').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {assignments.filter(a => a.status === 'completed').length} completed
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Add more admin dashboard content here */}
+      // If we get here, user is authenticated and is admin
+      try {
+        setDataLoading(true);
+        const supabase = createClient();
         
-      </main>
+        // Fetch all data in parallel
+        const [
+          { data: boxes, error: boxesError },
+          { data: volunteersData, error: volunteersError },
+          { data: logs, error: logsError },
+          { data: assignmentsData, error: assignmentsError }
+        ] = await Promise.all([
+          supabase.from('nest_boxes').select('*').order('created_at', { ascending: false }),
+          supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+          supabase.from('activity_logs')
+            .select('*')
+            .order('observation_date', { ascending: false })
+            .limit(10),
+          supabase.from('volunteer_assignments')
+            .select('*')
+            .order('due_date', { ascending: true })
+        ]);
+
+        // Check for errors
+        if (boxesError) throw boxesError;
+        if (volunteersError) throw volunteersError;
+        if (logsError) throw logsError;
+        if (assignmentsError) throw assignmentsError;
+
+        // Update state
+        setNestBoxes(boxes || []);
+        setVolunteers(volunteersData || []);
+        setActivityLogs(logs || []);
+        setAssignments(assignmentsData || []);
+        setError(null);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setError('Failed to load dashboard data. Please try again.');
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    checkAuthAndLoadData();
+  }, [authLoading, isAuthenticated, user, router]);
+
+  // Show loading state while checking auth or loading data
+  if (authLoading || dataLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if there was an error loading data
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-full max-w-md p-6 space-y-4">
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error}
+            </AlertDescription>
+          </Alert>
+          <Button 
+            className="w-full" 
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If we get here, user is authenticated and is admin
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+        
+        <div className="mt-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="nest-boxes">Nest Boxes</TabsTrigger>
+              <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
+              <TabsTrigger value="activity">Activity Logs</TabsTrigger>
+              <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview">
+              <DashboardOverview 
+                nestBoxes={nestBoxes}
+                volunteers={volunteers}
+                activityLogs={activityLogs}
+                assignments={assignments}
+              />
+            </TabsContent>
+            
+            <TabsContent value="nest-boxes">
+              <NestBoxesList boxes={nestBoxes} />
+            </TabsContent>
+            
+            <TabsContent value="volunteers">
+              <VolunteersList volunteers={volunteers} />
+            </TabsContent>
+            
+            <TabsContent value="activity">
+              <ActivityLogsList logs={activityLogs} />
+            </TabsContent>
+            
+            <TabsContent value="assignments">
+              <AssignmentsList assignments={assignments} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

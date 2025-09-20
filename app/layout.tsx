@@ -1,9 +1,6 @@
-import type React from "react"
 import type { Metadata } from "next"
 import { Space_Grotesk, DM_Sans } from "next/font/google"
-import { AuthProvider } from "@/components/auth/auth-provider"
-import { ToastProvider } from "@radix-ui/react-toast"
-import { Toaster } from "@/components/ui/toaster"
+import { ClientWrapper } from "@/components/layout/client-wrapper"
 import "./globals.css"
 
 const spaceGrotesk = Space_Grotesk({
@@ -31,13 +28,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${dmSans.variable}`} suppressHydrationWarning>
-      <body className="font-sans antialiased">
-        <AuthProvider>
-          <ToastProvider>
-            {children}
-            <Toaster />
-          </ToastProvider>
-        </AuthProvider>
+      <body className="font-sans antialiased" suppressHydrationWarning>
+        <ClientWrapper>
+          {children}
+        </ClientWrapper>
       </body>
     </html>
   )

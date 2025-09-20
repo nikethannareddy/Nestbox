@@ -6,21 +6,20 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export function createClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      flowType: 'pkce',
       autoRefreshToken: true,
-      detectSessionInUrl: true,
       persistSession: true,
-      storageKey: 'sb-auth-token',
+      detectSessionInUrl: true,
+      flowType: 'pkce', // Use PKCE flow for all environments
       debug: process.env.NODE_ENV === 'development',
     },
-    cookies: {
-      name: 'sb-auth-token',
-      lifetime: 60 * 60 * 24 * 7, // 7 days
-      domain: process.env.NODE_ENV === 'production' ? '.nestboxapp.com' : '',
-      path: '/',
-      sameSite: 'lax',
-    },
+    global: {
+      // Ensure we include the auth token in all requests
+      headers: {
+        'X-Client-Info': 'nestbox-web/1.0.0'
+      }
+    }
   })
 }
 
+// Create a single supabase client for client-side usage
 export const supabase = createClient()

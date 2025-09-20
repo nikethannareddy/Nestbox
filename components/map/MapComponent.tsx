@@ -42,81 +42,56 @@ export function MapComponent({
   const mapInstance = useRef<google.maps.Map | null>(null);
   const mapMarkers = useRef<google.maps.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
   useEffect(() => {
-    // Load the Google Maps API key from environment variables
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!key) {
-      console.error('Google Maps API key is not set. Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.');
+    if (!apiKey) {
+      setError('Google Maps API key is not configured');
       return;
     }
-    setApiKey(key);
-  }, []);
 
-  useEffect(() => {
-    if (!apiKey || !mapRef.current) return;
+    if (!mapRef.current) return;
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places'],
-    });
-
-    let isMounted = true;
-
-    const initMap = async () => {
+    const loadMap = async () => {
       try {
-        const google = await loader.load();
-        
-        if (!isMounted || !mapRef.current) return;
-
-        // Create the map instance
-        const map = new google.maps.Map(mapRef.current, {
-          center,
-          zoom,
-          disableDefaultUI: true,
-          zoomControl: true,
-          mapTypeControl: true,
-          scaleControl: true,
-          streetViewControl: true,
-          rotateControl: true,
-          fullscreenControl: true,
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
+        const loader = new Loader({
+          apiKey,
+          version: "weekly",
+          libraries: ["places"],
         });
 
-        mapInstance.current = map;
-        setMapLoaded(true);
+        await loader.load();
 
-        // Add click event listener if provided
+        if (!mapRef.current) return;
+
+        mapInstance.current = new window.google.maps.Map(mapRef.current, {
+          center,
+          zoom,
+          mapTypeId: 'terrain',
+          disableDefaultUI: true,
+          zoomControl: true,
+        });
+
+        // Add click handler if provided
         if (onMapClick) {
-          map.addListener('click', onMapClick);
+          mapInstance.current.addListener('click', onMapClick);
         }
 
-        // Clean up function
-        return () => {
-          if (mapInstance.current) {
-            google.maps.event.clearInstanceListeners(map);
-          }
-        };
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
+        setMapLoaded(true);
+      } catch (err) {
+        console.error('Error loading Google Maps:', err);
+        setError('Failed to load Google Maps. Please try again later.');
       }
     };
 
-    initMap();
+    loadMap();
 
     return () => {
-      isMounted = false;
-      // Clean up markers
-      mapMarkers.current.forEach(marker => marker.setMap(null));
-      mapMarkers.current = [];
+      // Clean up event listeners
+      if (mapInstance.current && onMapClick) {
+        window.google.maps.event.clearInstanceListeners(mapInstance.current);
+      }
     };
   }, [apiKey, center.lat, center.lng, zoom, onMapClick]);
 
@@ -129,22 +104,27 @@ export function MapComponent({
     mapMarkers.current = [];
 
     // Add new markers
-    markers.forEach((markerData, index) => {
-      if (!mapInstance.current) return;
-
-      const marker = new window.google.maps.Marker({
-        position: markerData.position,
+    markers.forEach((marker, index) => {
+      const mapMarker = new window.google.maps.Marker({
+        position: marker.position,
         map: mapInstance.current,
-        title: markerData.title || '',
-        icon: markerData.icon || undefined,
+        title: marker.title,
+        icon: marker.icon,
       });
 
       if (onMarkerClick) {
-        marker.addListener('click', () => onMarkerClick(marker, index));
+        mapMarker.addListener('click', () => onMarkerClick(mapMarker, index));
       }
 
-      mapMarkers.current.push(marker);
+      mapMarkers.current.push(mapMarker);
     });
+
+    // Fit bounds if markers exist
+    if (markers.length > 0) {
+      const bounds = new window.google.maps.LatLngBounds();
+      markers.forEach(marker => bounds.extend(marker.position));
+      mapInstance.current.fitBounds(bounds);
+    }
   }, [markers, mapLoaded, onMarkerClick]);
 
   // Update center when it changes
@@ -161,14 +141,27 @@ export function MapComponent({
     }
   }, [zoom, mapLoaded]);
 
+  if (error) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-gray-100`}>
+        <div className="text-center p-4">
+          <p className="text-red-500 mb-2">{error}</p>
+          <p className="text-sm text-gray-600">Please check your Google Maps API key configuration.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div 
-      ref={mapRef} 
-      className={className}
-      style={{ 
-        minHeight: '400px',
-        backgroundColor: '#e5e7eb' // Light gray background while loading
-      }}
-    />
+    <div className={className} ref={mapRef}>
+      {!mapLoaded && (
+        <div className="h-full flex items-center justify-center bg-gray-100">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Loading map...</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

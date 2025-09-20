@@ -215,6 +215,12 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
         <h1 className="text-3xl font-bold text-emerald-900">
           Welcome back, {user?.full_name || 'Volunteer'}!
         </h1>
+        <Link href="/volunteer/add-nest-box">
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <TreePine className="h-4 w-4 mr-2" />
+            Add Nest Box
+          </Button>
+        </Link>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">

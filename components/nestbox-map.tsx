@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,6 +63,18 @@ const getMarkerIcon = (status: string): string => {
   }
 };
 
+const debounce = (fn: any, delay: number) => {
+  let timeoutId: any;
+  return (...args: any[]) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      fn(...args);
+    }, delay);
+  };
+};
+
 export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId }: NestBoxMapProps) {
   const [nestBoxes, setNestBoxes] = useState<NestBox[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,32 +82,101 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<NestBoxStatus>("active")
   const [speciesFilter, setSpeciesFilter] = useState("all")
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(
-    initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number }>(
+    initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : { lat: 0, lng: 0 }
   )
   const [zoom, setZoom] = useState(initialZoom)
   const [highlightedBox, setHighlightedBox] = useState<string | null>(highlightNestBoxId || null)
+  const [isMounted, setIsMounted] = useState(false)
+  const mapRef = useRef<HTMLDivElement>(null)
 
-  const uniqueSpecies = useMemo(() => {
-    if (!nestBoxes || nestBoxes.length === 0) return []
-    const species = nestBoxes
-      .flatMap((box) => box.target_species || [])
-      .filter((species): species is string => species !== null && species !== undefined)
-    return [...new Set(species)]
-  }, [nestBoxes])
+  // Track if we've already fetched data
+  const hasFetched = useRef(false)
 
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      setIsMounted(false)
+    }
+  }, [])
+
+  // Fetch nest boxes
+  const fetchNestBoxes = useCallback(async () => {
+    if (hasFetched.current) return
+    
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const client = createClient()
+      
+      const { data, error: fetchError } = await client
+        .from("nest_boxes")
+        .select('*')
+        .order("created_at", { ascending: false })
+
+      if (fetchError) throw fetchError
+      
+      if (!isMounted) return
+      
+      setNestBoxes(data || [])
+
+      // Set initial location
+      if (initialCenter) {
+        setCurrentLocation({ lat: initialCenter[0], lng: initialCenter[1] })
+      } else if (data?.[0]) {
+        const firstBox = data[0]
+        setCurrentLocation({ lat: firstBox.latitude, lng: firstBox.longitude })
+      }
+    } catch (err) {
+      console.error("Error fetching nest boxes:", err)
+      if (isMounted) {
+        setError("Failed to load nest boxes. Please try again.")
+      }
+    } finally {
+      if (isMounted) {
+        setLoading(false)
+      }
+    }
+  }, [initialCenter, isMounted])
+
+  // Initial data fetch
+  useEffect(() => {
+    if (isMounted && !hasFetched.current) {
+      hasFetched.current = true
+      fetchNestBoxes()
+    }
+  }, [isMounted, fetchNestBoxes])
+
+  // Handle nest box highlighting
+  useEffect(() => {
+    if (highlightNestBoxId && nestBoxes.length > 0) {
+      setHighlightedBox(highlightNestBoxId)
+      const box = nestBoxes.find((box) => box.id === highlightNestBoxId)
+      if (box) {
+        setCurrentLocation({ lat: box.latitude, lng: box.longitude })
+        setZoom(18)
+      }
+    }
+  }, [highlightNestBoxId, nestBoxes])
+
+  // Filter and process nest boxes
   const filteredBoxes = useMemo(() => {
     if (!nestBoxes || nestBoxes.length === 0) return []
+    
     return nestBoxes
       .filter((box) => {
+        const searchLower = searchTerm.toLowerCase()
         const matchesSearch =
-          box.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          box.qr_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (box.target_species && box.target_species.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
+          !searchLower ||
+          box.name?.toLowerCase().includes(searchLower) ||
+          box.qr_code?.toLowerCase().includes(searchLower) ||
+          (box.target_species?.some(s => s.toLowerCase().includes(searchLower)))
 
         const matchesStatus = statusFilter === "active" || box.status === statusFilter
         const matchesSpecies =
-          speciesFilter === "all" || (box.target_species && box.target_species.includes(speciesFilter))
+          speciesFilter === "all" || 
+          (box.target_species?.includes(speciesFilter))
 
         return matchesSearch && matchesStatus && matchesSpecies
       })
@@ -106,69 +187,49 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
         id: box.id,
         icon: {
           url: getMarkerIcon(box.status),
-          scaledSize: typeof window !== 'undefined' && window.google?.maps ? new window.google.maps.Size(32, 32) : { width: 32, height: 32 }
+          scaledSize: { width: 32, height: 32 }
         }
       }))
   }, [nestBoxes, searchTerm, statusFilter, speciesFilter])
 
-  const handleMarkerClick = (marker: any, index: number) => {
-    const box = filteredBoxes[index];
+  // Handle marker click
+  const handleMarkerClick = useCallback((marker: any, index: number) => {
+    const box = filteredBoxes[index]
     if (box) {
-      setHighlightedBox(box.id);
-      // You can add additional logic here, like showing an info window
+      setHighlightedBox(box.id)
+      setCurrentLocation(box.position)
+      setZoom(18)
     }
-  };
+  }, [filteredBoxes])
 
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    // Handle map click if needed
-    console.log('Map clicked at:', e.latLng?.toJSON());
-  };
-
-  useEffect(() => {
-    fetchNestBoxes()
+  // Handle map click
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    // Clear selection when clicking on the map
+    setHighlightedBox(null)
   }, [])
 
-  useEffect(() => {
-    if (highlightNestBoxId) {
-      setHighlightedBox(highlightNestBoxId)
-      // Center map on the highlighted nest box
-      const box = nestBoxes.find((box) => box.id === highlightNestBoxId)
-      if (box) {
-        setCurrentLocation({ lat: box.latitude, lng: box.longitude })
-        setZoom(18)
-      }
-    }
-  }, [highlightNestBoxId, nestBoxes])
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={fetchNestBoxes} variant="outline">
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
-  const fetchNestBoxes = async () => {
-    try {
-      setLoading(true)
-      console.log("[v0] Fetching nest boxes from database")
-      const client = await createClient()
-      const { data, error } = await client.from("nest_boxes").select("*").order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("[v0] Database error:", error)
-        throw error
-      }
-
-      console.log("[v0] Fetched nest boxes:", data)
-      setNestBoxes(data || [])
-
-      // If we have an initial center from QR code, use that
-      if (initialCenter) {
-        setCurrentLocation({ lat: initialCenter[0], lng: initialCenter[1] })
-      } else if (data?.length > 0) {
-        // Otherwise center on the first nest box
-        const firstBox = data[0]
-        setCurrentLocation({ lat: firstBox.latitude, lng: firstBox.longitude })
-      }
-    } catch (err) {
-      console.error("[v0] Error fetching nest boxes:", err)
-      setError("Failed to load nest boxes. Please try again.")
-    } finally {
-      setLoading(false)
-    }
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p>Loading map data...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -206,7 +267,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Species</SelectItem>
-              {uniqueSpecies.map((species) => (
+              {nestBoxes.flatMap((box) => box.target_species || []).filter((species): species is string => species !== null && species !== undefined).map((species) => (
                 <SelectItem key={species} value={species}>
                   {species}
                 </SelectItem>
@@ -232,21 +293,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-gray-50">
-            {loading ? (
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-2" />
-                <p className="text-gray-500">Loading map...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center">
-                <p className="text-red-500 mb-2">Error loading map</p>
-                <Button variant="outline" onClick={fetchNestBoxes}>
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <p className="text-gray-500">No location data available</p>
-            )}
+            <p className="text-gray-500">No location data available</p>
           </div>
         )}
       </div>
@@ -285,7 +332,7 @@ export function NestBoxMap({ initialCenter, initialZoom = 13, highlightNestBoxId
             ))
           ) : (
             <p className="text-gray-500 text-center py-4">
-              {loading ? 'Loading...' : 'No nest boxes found'}
+              No nest boxes found
             </p>
           )}
         </div>

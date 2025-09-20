@@ -72,15 +72,16 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
     }
 
     setError('');
-    setIsLoading(true)
-    const { error: loginError } = await login(loginData.email, loginData.password);
+    setIsLoading(true);
     
-    if (loginError) {
-      setError(loginError);
-      setIsLoading(false)
-    } else {
-      // Redirect is handled by the auth provider
-      router.push('/dashboard');
+    try {
+      await login(loginData.email, loginData.password);
+      // The auth provider will handle the redirect based on user role
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
