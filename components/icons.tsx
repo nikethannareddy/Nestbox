@@ -20,10 +20,10 @@ import {
   MoreVertical,
   Pizza,
   Plus,
+  Printer,
   Settings,
   SunMedium,
   Trash,
-  Twitter,
   User,
   X,
   Eye,
@@ -157,7 +157,6 @@ export const Icons = {
   copy: Copy,
   circle: Circle,
   alertCircle: AlertCircle,
-  twitter: Twitter,
   eye: Eye,
   eyeOff: EyeOff,
   mail: Mail,
@@ -255,6 +254,7 @@ export const Icons = {
   dog: Dog,
   rabbit: Rabbit,
   turtle: Turtle,
+  printer: Printer,
 }
 
 // Missing Command import, using a placeholder

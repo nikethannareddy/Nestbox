@@ -170,9 +170,17 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
               className="w-full flex items-center justify-center gap-2"
               onClick={async () => {
                 setError(null);
-                const { error } = await loginWithGoogle();
-                if (error) {
-                  setError(error);
+                setIsLoading(true);
+                try {
+                  const { error } = await loginWithGoogle();
+                  if (error) {
+                    setError(error.message || 'Google login failed');
+                  }
+                } catch (err) {
+                  setError('An unexpected error occurred');
+                  console.error(err);
+                } finally {
+                  setIsLoading(false);
                 }
               }}
               disabled={isLoading}
@@ -284,9 +292,17 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
               className="w-full flex items-center justify-center gap-2"
               onClick={async () => {
                 setError(null);
-                const { error } = await loginWithGoogle();
-                if (error) {
-                  setError(error);
+                setIsLoading(true);
+                try {
+                  const { error } = await loginWithGoogle();
+                  if (error) {
+                    setError(error.message || 'Google login failed');
+                  }
+                } catch (err) {
+                  setError('An unexpected error occurred');
+                  console.error(err);
+                } finally {
+                  setIsLoading(false);
                 }
               }}
               disabled={isLoading}

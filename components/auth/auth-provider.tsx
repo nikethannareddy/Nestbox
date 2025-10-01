@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean
   error: string | null
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogle: () => Promise<{ error: Error | null }>
   logout: () => Promise<void>
   hasRole: (role: string | string[]) => boolean
 }
@@ -23,9 +24,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
-  const supabase = createClient()
   const isMounted = useRef(true)
+  const supabase = createClient()
+  const router = useRouter()
 
   // Check if user has required role(s)
   const hasRole = useCallback((role: string | string[]): boolean => {
@@ -61,23 +62,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Handle Google OAuth login
+  const loginWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      return { error };
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || 'Google login failed. Please try again.');
+      return { error };
+    }
+  };
+
   // Handle user logout
   const logout = async () => {
     try {
-      setIsLoading(true)
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setUser(null)
-      router.push('/auth')
+      setIsLoading(true);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear user state
+      setUser(null);
+      
+      // Clear all auth-related items from localStorage
+      if (typeof window !== 'undefined') {
+        const itemsToRemove = [
+          'sb-pquafubwzmdmesghxxyq-auth-token',
+          'sb-pquafubwzmdmesghxxyq-auth-token-expires-at',
+          'sb-pquafubwzmdmesghxxyq-refresh-token',
+          'sb-pquafubwzmdmesghxxyq-user'
+        ];
+        
+        itemsToRemove.forEach(item => {
+          window.localStorage.removeItem(item);
+        });
+        
+        // Force redirect to home page with cache busting
+        window.location.href = `/?t=${Date.now()}`;
+      }
     } catch (err) {
-      const error = err as Error
-      setError(error.message || 'Logout failed. Please try again.')
+      const error = err as Error;
+      setError(error.message || 'Logout failed. Please try again.');
     } finally {
       if (isMounted.current) {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
-  }
+  };
 
   // Handle auth state changes
   useEffect(() => {
@@ -199,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     error,
     login,
+    loginWithGoogle,
     logout,
     hasRole,
   }

@@ -65,6 +65,15 @@ export function AppHeader() {
               </Link>
             )}
             
+            {isAuthenticated && user?.role === "volunteer" && (
+              <Link href="/dashboard" className="inline-block">
+                <Button variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                  <User className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            )}
+            
             <div className="h-6 w-px bg-border/40 mx-2"></div>
             
             {isAuthenticated ? (
@@ -120,6 +129,15 @@ export function AppHeader() {
                   <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50">
                     <Shield className="h-4 w-4 mr-2" />
                     Admin
+                  </Button>
+                </Link>
+              )}
+              
+              {isAuthenticated && user?.role === "volunteer" && (
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="w-full justify-start text-blue-600 hover:bg-blue-50">
+                    <User className="h-4 w-4 mr-2" />
+                    Dashboard
                   </Button>
                 </Link>
               )}
