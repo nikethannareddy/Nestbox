@@ -14,7 +14,6 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { ArrowLeft, MapPin, Plus } from "lucide-react"
 import Link from "next/link"
-import { useEffect } from "react"
 
 const nestBoxSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -54,35 +53,20 @@ export default function AddNestBoxPage() {
     try {
       setIsLoading(true)
       
-      console.log("Submitting data:", data);
-      
-      const { data: result, error } = await supabase
-        .from("nest_boxes")
-        .insert([
-          {
-            name: data.name,
-            description: data.description,
-            latitude: parseFloat(data.latitude),
-            longitude: parseFloat(data.longitude),
-            status: data.status,
-            installation_date: data.installation_date || null,
-            last_maintenance: data.last_maintenance_date || null,
-            notes: data.notes,
-          },
-        ])
-        .select()
+      const { error } = await supabase.from("nest_boxes").insert([
+        {
+          name: data.name,
+          description: data.description,
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          status: data.status,
+          installation_date: data.installation_date || null,
+          last_maintenance_date: data.last_maintenance_date || null,
+          notes: data.notes,
+        },
+      ])
 
-      if (error) {
-        console.error("Supabase error details:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        throw error;
-      }
-
-      console.log("Insert result:", result)
+      if (error) throw error
 
       toast({
         title: "Success!",
@@ -90,19 +74,11 @@ export default function AddNestBoxPage() {
       })
 
       router.push("/admin")
-    } catch (error: any) {
-      console.error("Caught error:", {
-        message: error?.message,
-        details: error?.details,
-        code: error?.code,
-        name: error?.name,
-        stack: error?.stack,
-        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-      });
-      
+    } catch (error) {
+      console.error("Error adding nest box:", error)
       toast({
         title: "Error",
-        description: "Failed to add nest box. Please check the console for details.",
+        description: "Failed to add nest box. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -134,174 +110,6 @@ export default function AddNestBoxPage() {
       })
     }
   }
-
-  const logTableStructure = async () => {
-    try {
-      // Use the Supabase SQL editor to run a direct query
-      const { data, error } = await supabase.rpc('get_columns_info', {
-        table_name: 'nest_boxes'
-      });
-      
-      if (error) {
-        console.error('Supabase RPC error:', error);
-        
-        // Fallback: Try to get one row to see the structure
-        const { data: sampleData, error: sampleError } = await supabase
-          .from('nest_boxes')
-          .select('*')
-          .limit(1);
-          
-        if (sampleError) {
-          console.error('Error getting sample data:', sampleError);
-        } else {
-          console.log('Sample data structure:', sampleData?.[0]);
-        }
-        
-        return;
-      }
-      
-      console.log('Table structure:', data);
-    } catch (err) {
-      console.error('Error getting table structure:', err);
-    }
-  };
-
-  const logDatabaseSchema = async () => {
-    try {
-      // Get all tables in the public schema
-      const { data: tables, error: tablesError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public');
-      
-      if (tablesError) throw tablesError;
-      
-      console.log('Tables in database:', tables);
-      
-      // For each table, get its columns
-      for (const table of tables || []) {
-        const { data: columns, error: columnsError } = await supabase
-          .from('information_schema.columns')
-          .select('column_name, data_type')
-          .eq('table_schema', 'public')
-          .eq('table_name', table.table_name);
-        
-        if (columnsError) throw columnsError;
-        
-        console.log(`Columns in ${table.table_name}:`, columns);
-      }
-    } catch (err) {
-      console.error('Error getting database schema:', err);
-    }
-  };
-
-  const checkSchema = async () => {
-    try {
-      // First, check if the table exists
-      const { data: tableExists } = await supabase
-        .from('information_schema.tables')
-        .select('*')
-        .eq('table_schema', 'public')
-        .eq('table_name', 'nest_boxes')
-        .single();
-      
-      if (!tableExists) {
-        console.error('Error: nest_boxes table does not exist in the public schema');
-        return;
-      }
-
-      // If table exists, get its columns
-      const { data: columns, error } = await supabase.rpc('get_columns', {
-        table_name: 'nest_boxes'
-      });
-
-      if (error) {
-        console.error('Error getting columns:', error);
-        
-        // Fallback: Try a different approach
-        const { data } = await supabase
-          .from('nest_boxes')
-          .select('*')
-          .limit(1);
-          
-        if (data && data[0]) {
-          console.log('Sample row structure:', Object.keys(data[0]));
-        } else {
-          console.log('No data in nest_boxes table');
-        }
-        return;
-      }
-      
-      console.log('Table columns:', columns);
-    } catch (err) {
-      console.error('Error checking schema:', err);
-    }
-  };
-
-  const listAllTables = async () => {
-    try {
-      const { data: tables, error } = await supabase
-        .from('pg_tables')
-        .select('tablename, schemaname')
-        .order('schemaname')
-        .order('tablename');
-
-      if (error) throw error;
-      
-      console.log('All tables in database:');
-      tables?.forEach(table => {
-        console.log(`- ${table.schemaname}.${table.tablename}`);
-      });
-      
-      return tables;
-    } catch (err) {
-      console.error('Error listing tables:', err);
-      return [];
-    }
-  };
-
-  const findNestBoxesTable = async () => {
-    try {
-      // Check all schemas for the nest_boxes table
-      const { data, error } = await supabase
-        .from('information_schema.tables')
-        .select('table_schema, table_name')
-        .or('table_name.eq.nest_boxes,table_name.eq.nest_box,table_name.ilike.%nest%')
-        .order('table_schema')
-        .order('table_name');
-
-      if (error) throw error;
-      
-      if (data.length === 0) {
-        console.log('No nest boxes table found. Available tables:');
-        const { data: allTables } = await supabase
-          .from('pg_tables')
-          .select('schemaname, tablename')
-          .order('schemaname')
-          .order('tablename');
-        console.log(allTables);
-        return;
-      }
-      
-      console.log('Found matching tables:');
-      data.forEach(t => {
-        console.log(`- ${t.table_schema}.${t.table_name}`);
-      });
-      
-      return data;
-    } catch (err) {
-      console.error('Error finding nest_boxes table:', err);
-      return [];
-    }
-  };
-
-  useEffect(() => {
-    logTableStructure();
-    logDatabaseSchema();
-    checkSchema();
-    listAllTables();
-    findNestBoxesTable();
-  }, []);
 
   return (
     <div className="container mx-auto px-4 py-8">

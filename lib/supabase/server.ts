@@ -2,8 +2,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 /**
- * Create a Supabase server client
- * This client will be used in Server Components and Server Actions
+ * Especially important if using Fluid compute: Don't put this client in a
+ * global variable. Always create a new client within each function when using
+ * it.
  */
 export function createClient() {
   const cookieStore = cookies()
@@ -20,14 +21,14 @@ export function createClient() {
           try {
             cookieStore.set({ name, value, ...options })
           } catch (error) {
-            console.error('Error setting cookie:', error)
+            // Handle error if needed
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+            cookieStore.set({ name, value: '', ...options })
           } catch (error) {
-            console.error('Error removing cookie:', error)
+            // Handle error if needed
           }
         },
       },

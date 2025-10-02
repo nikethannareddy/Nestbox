@@ -2,91 +2,108 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 
 interface MapComponentProps {
-  center: { lat: number; lng: number };
+  center: {
+    lat: number;
+    lng: number;
+  };
   zoom?: number;
   markers?: Array<{
-    position: { lat: number; lng: number };
+    position: {
+      lat: number;
+      lng: number;
+    };
     title?: string;
-    icon?: google.maps.Icon | string;
+    icon?: string;
   }>;
   onMapClick?: (e: google.maps.MapMouseEvent) => void;
   onMarkerClick?: (marker: google.maps.Marker, index: number) => void;
-  onLoad?: (map: google.maps.Map) => void;
   className?: string;
 }
 
 declare global {
   interface Window {
+    initMap: () => void;
     google: typeof google;
   }
 }
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
-const loader = new Loader({
-  apiKey: GOOGLE_MAPS_API_KEY,
-  version: 'weekly',
-  libraries: ['places'],
-});
-
-export const MapComponent = ({
+export default function MapComponent({
   center,
   zoom = 12,
   markers = [],
   onMapClick,
   onMarkerClick,
-  onLoad,
-  className = 'h-full w-full',
-}: MapComponentProps) => {
+  className = 'h-[400px] w-full',
+}: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const mapMarkers = useRef<google.maps.Marker[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [apiKey, setApiKey] = useState('');
 
-  // Initialize map
   useEffect(() => {
-    if (!mapRef.current) return;
+    // Load the Google Maps API key from environment variables
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!key) {
+      console.error('Google Maps API key is not set. Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.');
+      return;
+    }
+    setApiKey(key);
+  }, []);
 
-    let map: google.maps.Map | null = null;
+  useEffect(() => {
+    if (!apiKey || !mapRef.current) return;
+
+    const loader = new Loader({
+      apiKey,
+      version: 'weekly',
+      libraries: ['places'],
+    });
+
     let isMounted = true;
 
     const initMap = async () => {
       try {
-        await loader.load();
+        const google = await loader.load();
         
         if (!isMounted || !mapRef.current) return;
-        
-        // Clear any existing map instance
-        if (mapInstance.current) {
-          google.maps.event.clearInstanceListeners(mapInstance.current);
-          mapInstance.current = null;
-        }
 
-        map = new window.google.maps.Map(mapRef.current, {
-          center: { lat: center.lat, lng: center.lng },
+        // Create the map instance
+        const map = new google.maps.Map(mapRef.current, {
+          center,
           zoom,
           disableDefaultUI: true,
           zoomControl: true,
           mapTypeControl: true,
-          streetViewControl: false,
+          scaleControl: true,
+          streetViewControl: true,
+          rotateControl: true,
           fullscreenControl: true,
+          styles: [
+            {
+              featureType: 'poi',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+          ],
         });
 
-        if (onLoad) {
-          onLoad(map);
-        }
+        mapInstance.current = map;
+        setMapLoaded(true);
 
+        // Add click event listener if provided
         if (onMapClick) {
           map.addListener('click', onMapClick);
         }
 
-        mapInstance.current = map;
-        setIsLoaded(true);
-        setMapError(null);
+        // Clean up function
+        return () => {
+          if (mapInstance.current) {
+            google.maps.event.clearInstanceListeners(map);
+          }
+        };
       } catch (error) {
         console.error('Error loading Google Maps:', error);
-        setMapError('Failed to load Google Maps. Please try again.');
       }
     };
 
@@ -94,76 +111,65 @@ export const MapComponent = ({
 
     return () => {
       isMounted = false;
-      if (map) {
-        try {
-          // Clear all event listeners
-          google.maps.event.clearInstanceListeners(map);
-          
-          // Remove the map instance
-          if (mapRef.current) {
-            const mapContainer = mapRef.current;
-            if (mapContainer && mapContainer.firstChild) {
-              // Remove all child nodes
-              while (mapContainer.firstChild) {
-                mapContainer.removeChild(mapContainer.firstChild);
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Error cleaning up map:', e);
-        }
-      }
-      markersRef.current = [];
+      // Clean up markers
+      mapMarkers.current.forEach(marker => marker.setMap(null));
+      mapMarkers.current = [];
     };
-  }, [center.lat, center.lng, zoom, onLoad, onMapClick]);
+  }, [apiKey, center.lat, center.lng, zoom, onMapClick]);
 
-  // Update markers
+  // Update markers when they change
   useEffect(() => {
-    if (!mapInstance.current) return;
+    if (!mapInstance.current || !mapLoaded) return;
 
     // Clear existing markers
-    markersRef.current.forEach(marker => {
-      if (marker) {
-        marker.setMap(null);
-      }
-    });
-    markersRef.current = [];
+    mapMarkers.current.forEach(marker => marker.setMap(null));
+    mapMarkers.current = [];
 
     // Add new markers
-    markers.forEach((marker, index) => {
-      const mapMarker = new google.maps.Marker({
-        position: marker.position,
+    markers.forEach((markerData, index) => {
+      if (!mapInstance.current) return;
+
+      const marker = new window.google.maps.Marker({
+        position: markerData.position,
         map: mapInstance.current,
-        title: marker.title,
-        icon: marker.icon,
+        title: markerData.title || '',
+        icon: markerData.icon || undefined,
       });
 
       if (onMarkerClick) {
-        mapMarker.addListener('click', () => {
-          onMarkerClick(mapMarker, index);
-        });
+        marker.addListener('click', () => onMarkerClick(marker, index));
       }
 
-      markersRef.current.push(mapMarker);
+      mapMarkers.current.push(marker);
     });
-  }, [markers, onMarkerClick]);
+  }, [markers, mapLoaded, onMarkerClick]);
+
+  // Update center when it changes
+  useEffect(() => {
+    if (mapInstance.current && mapLoaded) {
+      mapInstance.current.setCenter(center);
+    }
+  }, [center.lat, center.lng, mapLoaded]);
+
+  // Update zoom when it changes
+  useEffect(() => {
+    if (mapInstance.current && mapLoaded) {
+      mapInstance.current.setZoom(zoom);
+    }
+  }, [zoom, mapLoaded]);
 
   return (
     <div className={className} ref={mapRef}>
-      {mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-          <div className="bg-background p-4 rounded-lg shadow-lg text-center">
-            <h3 className="text-lg font-medium mb-2">Map Error</h3>
-            <p className="mb-4">{mapError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Reload Map
-            </button>
-          </div>
+      {!apiKey && (
+        <div className="flex h-full items-center justify-center bg-gray-100">
+          <p>Google Maps API key is not configured.</p>
+        </div>
+      )}
+      {apiKey && !mapLoaded && (
+        <div className="flex h-full items-center justify-center bg-gray-100">
+          <p>Loading map...</p>
         </div>
       )}
     </div>
   );
-};
+}

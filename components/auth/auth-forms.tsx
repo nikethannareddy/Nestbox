@@ -72,16 +72,15 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
     }
 
     setError('');
-    setIsLoading(true);
+    setIsLoading(true)
+    const { error: loginError } = await login(loginData.email, loginData.password);
     
-    try {
-      await login(loginData.email, loginData.password);
-      // The auth provider will handle the redirect based on user role
-    } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'Login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
+    if (loginError) {
+      setError(loginError);
+      setIsLoading(false)
+    } else {
+      // Redirect is handled by the auth provider
+      router.push('/dashboard');
     }
   };
 
@@ -170,17 +169,9 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
               className="w-full flex items-center justify-center gap-2"
               onClick={async () => {
                 setError(null);
-                setIsLoading(true);
-                try {
-                  const { error } = await loginWithGoogle();
-                  if (error) {
-                    setError(error.message || 'Google login failed');
-                  }
-                } catch (err) {
-                  setError('An unexpected error occurred');
-                  console.error(err);
-                } finally {
-                  setIsLoading(false);
+                const { error } = await loginWithGoogle();
+                if (error) {
+                  setError(error);
                 }
               }}
               disabled={isLoading}
@@ -292,17 +283,9 @@ export function AuthForms({ onAuthSuccess, initialMode }: AuthFormsProps) {
               className="w-full flex items-center justify-center gap-2"
               onClick={async () => {
                 setError(null);
-                setIsLoading(true);
-                try {
-                  const { error } = await loginWithGoogle();
-                  if (error) {
-                    setError(error.message || 'Google login failed');
-                  }
-                } catch (err) {
-                  setError('An unexpected error occurred');
-                  console.error(err);
-                } finally {
-                  setIsLoading(false);
+                const { error } = await loginWithGoogle();
+                if (error) {
+                  setError(error);
                 }
               }}
               disabled={isLoading}
