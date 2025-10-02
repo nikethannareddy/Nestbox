@@ -2,7 +2,7 @@
 
 import { NestBoxLogo } from "@/components/nestbox-logo"
 import { Button } from "@/components/ui/button"
-import { Shield, User, LogOut, Menu } from "lucide-react"
+import { Shield, User, LogOut, Menu, TreePine } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { usePathname, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -65,6 +65,15 @@ export function AppHeader() {
               </Link>
             )}
             
+            {isAuthenticated && user?.role === "volunteer" && (
+              <Link href="/dashboard" className="inline-block">
+                <Button variant="ghost" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                  <TreePine className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            )}
+            
             <div className="h-6 w-px bg-border/40 mx-2"></div>
             
             {isAuthenticated ? (
@@ -120,6 +129,15 @@ export function AppHeader() {
                   <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50">
                     <Shield className="h-4 w-4 mr-2" />
                     Admin
+                  </Button>
+                </Link>
+              )}
+              
+              {isAuthenticated && user?.role === "volunteer" && (
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="w-full justify-start text-emerald-600 hover:bg-emerald-50">
+                    <TreePine className="h-4 w-4 mr-2" />
+                    Dashboard
                   </Button>
                 </Link>
               )}
