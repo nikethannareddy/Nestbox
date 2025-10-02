@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Award, CheckCircle, AlertTriangle, Camera, TreePine, Bird, Loader2 } from "lucide-react";
+import { MapPin, Award, CheckCircle, AlertTriangle, Camera, TreePine, Bird, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 
 interface NestBox {
@@ -210,11 +210,22 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-emerald-900">
-          Welcome back, {user?.full_name || 'Volunteer'}!
-        </h1>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-emerald-900">
+            Welcome back, {user?.full_name || 'Volunteer'}!
+          </h1>
+          <p className="text-muted-foreground">
+            Here's your activity overview and recent updates.
+          </p>
+        </div>
+        <Button asChild className="gap-2">
+          <Link href="/dashboard/nest-boxes/new">
+            <Plus className="h-4 w-4" />
+            Add Nest Box
+          </Link>
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
